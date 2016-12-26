@@ -18,9 +18,9 @@ var (
 )
 
 func main() {
-	pflag.StringP(&addr, "addr", ":4730", "listening on, such as 0.0.0.0:4730")
-	pflag.StringP(&coredumpDir, "coredump", "./", "coredump file path")
-	pflag.StringP(&storageDir, "storage-dir", "/tmp", "Directory where LevelDB file is stored.")
+	pflag.StringVar(&addr, "addr", ":4730", "listening on, such as 0.0.0.0:4730")
+	pflag.StringVar(&coredumpDir, "coredump", "./", "coredump file path")
+	pflag.StringVar(&storageDir, "storage-dir", "/tmp", "Directory where LevelDB file is stored.")
 
 	flags.InitFlags()
 	logs.InitLogs()
