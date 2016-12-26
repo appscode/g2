@@ -1,31 +1,21 @@
-package storage
+package storage_test
 
 import (
-	"database/sql"
 	"flag"
+	"io/ioutil"
 	"log"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
 	. "github.com/appscode/g2/pkg/runtime"
+	. "github.com/appscode/g2/pkg/storage"
 	. "github.com/appscode/g2/pkg/storage/leveldb"
 )
 
-const (
-	mysqlSource      = "root:@tcp(localhost:3306)/gogearmand?parseTime=true"
-	mysqlCreateTable = `CREATE TABLE job(Handle varchar(128),Id varchar(128),Priority INT, CreateAt TIMESTAMP,
-		FuncName varchar(128),Data varchar(16384)) ENGINE=InnoDB;`
-	mysqlDropTable = `DROP TABLE job`
-	TimeFormatStr  = "2006-01-02 15:04:05"
-)
-
 var (
-	redis = flag.String("redis", "localhost:6379", "redis address")
-)
-
-var (
-	redisQ *LevelDbQ
+	db JobQueue
 )
 
 var testJobs = []*Job{
@@ -45,21 +35,20 @@ var testJobs = []*Job{
 
 func init() {
 	flag.Parse()
-	redisQ = &LevelDbQ{}
 
-	//remove table if it was created before
-	operateTable(mysqlDropTable)
-	if err := operateTable(mysqlCreateTable); err != nil {
+	dir, err := ioutil.TempDir(os.TempDir(), "g2")
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Using temp dir %v", dir)
+	db, err = New(dir)
+	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func TestInit(t *testing.T) {
-	testInit(t, redisQ)
-}
-
 func TestAddAndGetJob(t *testing.T) {
-	testGetJob(t, redisQ, nil)
+	testGetJob(t, db, nil)
 
 	var jobs []*Job
 	for i := 0; i < 2; i++ {
@@ -67,17 +56,17 @@ func TestAddAndGetJob(t *testing.T) {
 			if i == 5 {
 				continue
 			}
-			testAddjob(t, redisQ, j)
+			testAddjob(t, db, j)
 			jobs = append(jobs, j)
 		}
 	}
-	testGetJob(t, redisQ, jobs[0:len(testJobs)])
+	testGetJob(t, db, jobs[0:len(testJobs)])
 }
 
 func TestDoneJob(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		for _, job := range testJobs {
-			testDoneJob(t, redisQ, job)
+			testDoneJob(t, db, job)
 		}
 	}
 }
@@ -97,9 +86,9 @@ func BenchmarkBasicOpts(b *testing.B) {
 			t := &testing.T{}
 
 			for _, j := range jobs {
-				testAddjob(t, redisQ, j)
+				testAddjob(t, db, j)
 			}
-			testGetJob(t, redisQ, jobs)
+			testGetJob(t, db, jobs)
 		}()
 	}
 	wg.Wait()
@@ -112,17 +101,11 @@ func BenchmarkBasicOpts(b *testing.B) {
 			t := &testing.T{}
 
 			for _, j := range jobs {
-				testDoneJob(t, redisQ, j)
+				testDoneJob(t, db, j)
 			}
 		}()
 	}
 	wg.Wait()
-}
-
-func testInit(t *testing.T, store JobQueue) {
-	if err := store.Init(); err != nil {
-		t.Errorf("failed to store init, err:%s", err.Error())
-	}
 }
 
 func testAddjob(t *testing.T, store JobQueue, j *Job) {
@@ -150,16 +133,4 @@ func testDoneJob(t *testing.T, store JobQueue, j *Job) {
 	if err != nil {
 		t.Errorf("failed to done job, err:%s", err.Error())
 	}
-}
-
-func operateTable(str string) (err error) {
-	db, err := sql.Open("mysql", mysqlSource)
-	if err != nil {
-		return
-	}
-	defer db.Close()
-
-	_, err = db.Exec(str)
-
-	return
 }
