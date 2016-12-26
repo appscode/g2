@@ -108,8 +108,30 @@ handle, err := c.Do("ToUpper", echo, client.JobNormal, jobHandler)
 // ...
 ```
 
+Build Instructions
+==================
+```sh
+# dev build
+./hack/make.py
+
+# Install/Update dependency (needs glide)
+glide slow
+
+# Build Docker image
+./hack/docker/setup.sh
+
+# Push Docker image (https://hub.docker.com/r/appscode/gearmand/)
+./hack/docker/setup.sh push
+
+# Deploy to Kubernetes (one time setup operation)
+kubectl run gearmand --image=appscode/gearmand:<tag> --replica=1
+
+# Deploy new image
+kubectl set image deployment/gearmand tc=appscode/gearmand:<tag>
+```
+
 Acknowledgement
-==========
+===============
  * Client and Worker package forked from https://github.com/mikespook/gearman-go
  * Server package forked from https://github.com/ngaut/gearmand
  * Gearman project (http://gearman.org/protocol/)
