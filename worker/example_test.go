@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	rt "github.com/appscode/g2/pkg/runtime"
 	"github.com/appscode/g2/worker"
 )
 
@@ -12,7 +13,7 @@ func ExampleWorker() {
 	w := worker.New(worker.Unlimited)
 	defer w.Close()
 	// Add a gearman job server
-	if err := w.AddServer(worker.Network, "127.0.0.1:4730"); err != nil {
+	if err := w.AddServer(rt.Network, "127.0.0.1:4730"); err != nil {
 		fmt.Println(err)
 		return
 	}

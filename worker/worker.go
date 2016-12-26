@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	rt "github.com/appscode/g2/pkg/runtime"
 )
 
 const (
@@ -45,7 +47,7 @@ func New(limit int) (worker *Worker) {
 	worker = &Worker{
 		agents:      make([]*agent, 0, limit),
 		funcs:       make(jobFuncs),
-		in:          make(chan *inPack, queueSize),
+		in:          make(chan *inPack, rt.QueueSize),
 		runningJobs: 0,
 	}
 	if limit != Unlimited {
@@ -106,12 +108,12 @@ func (worker *Worker) addFunc(funcname string, timeout uint32) {
 func prepFuncOutpack(funcname string, timeout uint32) *outPack {
 	outpack := getOutPack()
 	if timeout == 0 {
-		outpack.dataType = dtCanDo
+		outpack.dataType = rt.PT_CanDo
 		outpack.data = []byte(funcname)
 	} else {
-		outpack.dataType = dtCanDoTimeout
+		outpack.dataType = rt.PT_CanDoTimeout
 		l := len(funcname)
-		outpack.data = getBuffer(l + 5)
+		outpack.data = rt.NewBuffer(l + 5)
 		copy(outpack.data, []byte(funcname))
 		outpack.data[l] = '\x00'
 		binary.BigEndian.PutUint32(outpack.data[l+1:], timeout)
@@ -136,7 +138,7 @@ func (worker *Worker) RemoveFunc(funcname string) (err error) {
 // inner remove
 func (worker *Worker) removeFunc(funcname string) {
 	outpack := getOutPack()
-	outpack.dataType = dtCantDo
+	outpack.dataType = rt.PT_CantDo
 	outpack.data = []byte(funcname)
 	worker.broadcast(outpack)
 }
@@ -144,11 +146,11 @@ func (worker *Worker) removeFunc(funcname string) {
 // inner package handling
 func (worker *Worker) handleInPack(inpack *inPack) {
 	switch inpack.dataType {
-	case dtNoJob:
+	case rt.PT_NoJob:
 		inpack.a.PreSleep()
-	case dtNoop:
+	case rt.PT_Noop:
 		inpack.a.Grab()
-	case dtJobAssign, dtJobAssignUniq:
+	case rt.PT_JobAssign, rt.PT_JobAssignUniq:
 		go func() {
 			if err := worker.exec(inpack); err != nil {
 				worker.err(err)
@@ -158,10 +160,10 @@ func (worker *Worker) handleInPack(inpack *inPack) {
 			worker.limit <- true
 		}
 		inpack.a.Grab()
-	case dtError:
+	case rt.PT_Error:
 		worker.err(inpack.Err())
 		fallthrough
-	case dtEchoRes:
+	case rt.PT_EchoRes:
 		fallthrough
 	default:
 		worker.customHandler(inpack)
@@ -252,7 +254,7 @@ func (worker *Worker) Reconnect() error {
 // Echo
 func (worker *Worker) Echo(data []byte) {
 	outpack := getOutPack()
-	outpack.dataType = dtEchoReq
+	outpack.dataType = rt.PT_EchoReq
 	outpack.data = data
 	worker.broadcast(outpack)
 }
@@ -261,7 +263,7 @@ func (worker *Worker) Echo(data []byte) {
 // Both from the worker and job servers.
 func (worker *Worker) Reset() {
 	outpack := getOutPack()
-	outpack.dataType = dtResetAbilities
+	outpack.dataType = rt.PT_ResetAbilities
 	worker.broadcast(outpack)
 	worker.funcs = make(jobFuncs)
 }
@@ -270,7 +272,7 @@ func (worker *Worker) Reset() {
 func (worker *Worker) SetId(id string) {
 	worker.Id = id
 	outpack := getOutPack()
-	outpack.dataType = dtSetClientId
+	outpack.dataType = rt.PT_SetClientId
 	outpack.data = []byte(id)
 	worker.broadcast(outpack)
 }
@@ -316,12 +318,12 @@ func (worker *Worker) exec(inpack *inPack) (err error) {
 	if worker.running {
 		outpack := getOutPack()
 		if r.err == nil {
-			outpack.dataType = dtWorkComplete
+			outpack.dataType = rt.PT_WorkComplete
 		} else {
 			if len(r.data) == 0 {
-				outpack.dataType = dtWorkFail
+				outpack.dataType = rt.PT_WorkFail
 			} else {
-				outpack.dataType = dtWorkException
+				outpack.dataType = rt.PT_WorkException
 			}
 			err = r.err
 		}

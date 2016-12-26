@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"../client"
+	rt "github.com/appscode/g2/pkg/runtime"
 )
 
 const port = `3700`
@@ -85,7 +86,7 @@ func TestBasicDisconnect(t *testing.T) {
 	timeout := make(chan bool, 1)
 	done := make(chan bool, 1)
 
-	if err := worker.AddServer(Network, "127.0.0.1:"+port); err != nil {
+	if err := worker.AddServer(rt.Network, "127.0.0.1:"+port); err != nil {
 		t.Error(err)
 	}
 	work_done := false
@@ -160,7 +161,7 @@ func TestDcRc(t *testing.T) {
 	timeout := make(chan bool, 1)
 	done := make(chan bool, 1)
 
-	if err := worker.AddServer(Network, "127.0.0.1:"+port); err != nil {
+	if err := worker.AddServer(rt.Network, "127.0.0.1:"+port); err != nil {
 		t.Error(err)
 	}
 	work_done := false
@@ -231,9 +232,9 @@ func TestDcRc(t *testing.T) {
 }
 
 func send_client_request() {
-	c, err := client.New(Network, "127.0.0.1:"+port)
+	c, err := client.New(rt.Network, "127.0.0.1:"+port)
 	if err == nil {
-		_, err = c.DoBg("gearman-go-workertest", []byte{}, client.JobHigh)
+		_, err = c.DoBg("gearman-go-workertest", []byte{}, rt.JobHigh)
 		if err != nil {
 			log.Println("error sending client request " + err.Error())
 		}

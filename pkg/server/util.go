@@ -67,7 +67,7 @@ func allocJobId() string {
 }
 
 type event struct {
-	tp            uint32
+	tp            runtime.PT
 	args          *Tuple
 	result        chan interface{}
 	fromSessionId int64
@@ -83,8 +83,8 @@ type Tuple struct {
 	t0, t1, t2, t3, t4, t5 interface{}
 }
 
-func decodeArgs(cmd uint32, buf []byte) ([][]byte, bool) {
-	argc := runtime.ArgCount(cmd)
+func decodeArgs(cmd runtime.PT, buf []byte) ([][]byte, bool) {
+	argc := cmd.ArgCount()
 	//log.Debug("cmd:", runtime.CmdDescription(cmd), "details:", buf)
 	if argc == 0 {
 		return nil, true
@@ -122,7 +122,7 @@ func decodeArgs(cmd uint32, buf []byte) ([][]byte, bool) {
 	return args, true
 }
 
-func sendReply(out chan []byte, tp uint32, data [][]byte) {
+func sendReply(out chan []byte, tp runtime.PT, data [][]byte) {
 	out <- constructReply(tp, data)
 }
 
@@ -130,11 +130,11 @@ func sendReplyResult(out chan []byte, data []byte) {
 	out <- data
 }
 
-func constructReply(tp uint32, data [][]byte) []byte {
+func constructReply(tp runtime.PT, data [][]byte) []byte {
 	buf := &bytes.Buffer{}
 	buf.Write(respMagic)
 
-	err := binary.Write(buf, binary.BigEndian, tp)
+	err := binary.Write(buf, binary.BigEndian, tp.Uint32())
 	if err != nil {
 		panic("should never happend")
 	}
@@ -162,18 +162,6 @@ func constructReply(tp uint32, data [][]byte) []byte {
 	return buf.Bytes()
 }
 
-func validCmd(cmd uint32) bool {
-	if cmd >= runtime.CAN_DO && cmd <= runtime.SUBMIT_JOB_EPOCH {
-		return true
-	}
-
-	if cmd != 39 { //filter gearmand
-		log.Warningf("invalid cmd %d", cmd)
-	}
-
-	return false
-}
-
 func bytes2str(o interface{}) string {
 	return string(o.([]byte))
 }
@@ -190,10 +178,10 @@ func int2bytes(n interface{}) []byte {
 	return []byte(strconv.Itoa(n.(int)))
 }
 
-func ReadMessage(r io.Reader) (uint32, []byte, error) {
+func ReadMessage(r io.Reader) (runtime.PT, []byte, error) {
 	_, tp, size, err := readHeader(r)
 	if err != nil {
-		return 0, nil, err
+		return tp, nil, err
 	}
 
 	if size == 0 {
@@ -206,7 +194,7 @@ func ReadMessage(r io.Reader) (uint32, []byte, error) {
 	return tp, buf, err
 }
 
-func readHeader(r io.Reader) (magic uint32, tp uint32, size uint32, err error) {
+func readHeader(r io.Reader) (magic uint32, tp runtime.PT, size uint32, err error) {
 	magic, err = readUint32(r)
 	if err != nil {
 		return
@@ -218,24 +206,17 @@ func readHeader(r io.Reader) (magic uint32, tp uint32, size uint32, err error) {
 		return
 	}
 
-	tp, err = readUint32(r)
+	var cmd uint32
+	cmd, err = readUint32(r)
+	if err != nil {
+		return
+	}
+	tp, err = runtime.NewPT(cmd)
 	if err != nil {
 		return
 	}
 
-	if !validCmd(tp) {
-		//gearman's bug, as protocol, we should treat this an error, but gearman allow it
-		if tp == 39 { //wtf: benchmark worker send this, and i can not find it in protocol description
-			tp = runtime.GRAB_JOB_UNIQ
-			size, err = readUint32(r)
-			return
-		}
-		err = invalidArg
-		return
-	}
-
 	size, err = readUint32(r)
-
 	return
 }
 
@@ -288,7 +269,7 @@ func readUint32(r io.Reader) (uint32, error) {
 }
 
 func validProtocolDef() {
-	if runtime.CAN_DO != 1 || runtime.SUBMIT_JOB_EPOCH != 36 { //protocol check
+	if runtime.PT_CanDo != 1 || runtime.PT_SubmitJobEpoch != 36 { //protocol check
 		panic("protocol define not match")
 	}
 }
@@ -351,18 +332,18 @@ func LocalIP() (net.IP, error) {
 	return nil, errors.New("cannot find local IP address")
 }
 
-func cmd2Priority(cmd uint32) int {
+func cmd2Priority(cmd runtime.PT) int {
 	switch cmd {
-	case runtime.SUBMIT_JOB_HIGH, runtime.SUBMIT_JOB_HIGH_BG:
+	case runtime.PT_SubmitJobHigh, runtime.PT_SubmitJobHighBG:
 		return runtime.PRIORITY_HIGH
 	}
 
 	return runtime.PRIORITY_LOW
 }
 
-func isBackGround(cmd uint32) bool {
+func isBackGround(cmd runtime.PT) bool {
 	switch cmd {
-	case runtime.SUBMIT_JOB_LOW_BG, runtime.SUBMIT_JOB_HIGH_BG:
+	case runtime.PT_SubmitJobLowBG, runtime.PT_SubmitJobHighBG:
 		return true
 	}
 

@@ -5,11 +5,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strconv"
+
+	rt "github.com/appscode/g2/pkg/runtime"
 )
 
 // Worker side job
 type inPack struct {
-	dataType             uint32
+	dataType             rt.PT
 	data                 []byte
 	handle, uniqueId, fn string
 	a                    *agent
@@ -37,7 +39,7 @@ func (inpack *inPack) UniqueId() string {
 }
 
 func (inpack *inPack) Err() error {
-	if inpack.dataType == dtError {
+	if inpack.dataType == rt.PT_Error {
 		return getError(inpack.data)
 	}
 	return nil
@@ -47,10 +49,10 @@ func (inpack *inPack) Err() error {
 // Using this in a job's executing.
 func (inpack *inPack) SendData(data []byte) {
 	outpack := getOutPack()
-	outpack.dataType = dtWorkData
+	outpack.dataType = rt.PT_WorkData
 	hl := len(inpack.handle)
 	l := hl + len(data) + 1
-	outpack.data = getBuffer(l)
+	outpack.data = rt.NewBuffer(l)
 	copy(outpack.data, []byte(inpack.handle))
 	copy(outpack.data[hl+1:], data)
 	inpack.a.write(outpack)
@@ -58,10 +60,10 @@ func (inpack *inPack) SendData(data []byte) {
 
 func (inpack *inPack) SendWarning(data []byte) {
 	outpack := getOutPack()
-	outpack.dataType = dtWorkWarning
+	outpack.dataType = rt.PT_WorkWarning
 	hl := len(inpack.handle)
 	l := hl + len(data) + 1
-	outpack.data = getBuffer(l)
+	outpack.data = rt.NewBuffer(l)
 	copy(outpack.data, []byte(inpack.handle))
 	copy(outpack.data[hl+1:], data)
 	inpack.a.write(outpack)
@@ -73,11 +75,11 @@ func (inpack *inPack) UpdateStatus(numerator, denominator int) {
 	n := []byte(strconv.Itoa(numerator))
 	d := []byte(strconv.Itoa(denominator))
 	outpack := getOutPack()
-	outpack.dataType = dtWorkStatus
+	outpack.dataType = rt.PT_WorkStatus
 	hl := len(inpack.handle)
 	nl := len(n)
 	dl := len(d)
-	outpack.data = getBuffer(hl + nl + dl + 2)
+	outpack.data = rt.NewBuffer(hl + nl + dl + 2)
 	copy(outpack.data, []byte(inpack.handle))
 	copy(outpack.data[hl+1:], n)
 	copy(outpack.data[hl+nl+2:], d)
@@ -86,31 +88,34 @@ func (inpack *inPack) UpdateStatus(numerator, denominator int) {
 
 // Decode job from byte slice
 func decodeInPack(data []byte) (inpack *inPack, l int, err error) {
-	if len(data) < minPacketLength { // valid package should not less 12 bytes
+	if len(data) < rt.MinPacketLength { // valid package should not less 12 bytes
 		err = fmt.Errorf("Invalid data: %v", data)
 		return
 	}
 	dl := int(binary.BigEndian.Uint32(data[8:12]))
-	if len(data) < (dl + minPacketLength) {
+	if len(data) < (dl + rt.MinPacketLength) {
 		err = fmt.Errorf("Not enough data: %v", data)
 		return
 	}
-	dt := data[minPacketLength : dl+minPacketLength]
+	dt := data[rt.MinPacketLength : dl+rt.MinPacketLength]
 	if len(dt) != int(dl) { // length not equal
 		err = fmt.Errorf("Invalid data: %v", data)
 		return
 	}
 	inpack = getInPack()
-	inpack.dataType = binary.BigEndian.Uint32(data[4:8])
+	inpack.dataType, err = rt.NewPT(binary.BigEndian.Uint32(data[4:8]))
+	if err != nil {
+		return
+	}
 	switch inpack.dataType {
-	case dtJobAssign:
+	case rt.PT_JobAssign:
 		s := bytes.SplitN(dt, []byte{'\x00'}, 3)
 		if len(s) == 3 {
 			inpack.handle = string(s[0])
 			inpack.fn = string(s[1])
 			inpack.data = s[2]
 		}
-	case dtJobAssignUniq:
+	case rt.PT_JobAssignUniq:
 		s := bytes.SplitN(dt, []byte{'\x00'}, 4)
 		if len(s) == 4 {
 			inpack.handle = string(s[0])
@@ -121,6 +126,6 @@ func decodeInPack(data []byte) (inpack *inPack, l int, err error) {
 	default:
 		inpack.data = dt
 	}
-	l = dl + minPacketLength
+	l = dl + rt.MinPacketLength
 	return
 }

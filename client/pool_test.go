@@ -2,6 +2,8 @@ package client
 
 import (
 	"testing"
+
+	"github.com/appscode/g2/pkg/runtime"
 )
 
 var (
@@ -42,7 +44,7 @@ func TestPoolEcho(t *testing.T) {
 
 func TestPoolDoBg(t *testing.T) {
 	addr, handle, err := pool.DoBg("ToUpper",
-		[]byte("abcdef"), JobLow)
+		[]byte("abcdef"), runtime.JobLow)
 	if err != nil {
 		t.Error(err)
 		return
@@ -65,7 +67,7 @@ func TestPoolDo(t *testing.T) {
 		return
 	}
 	addr, handle, err := pool.Do("ToUpper",
-		[]byte("abcdef"), JobLow, jobHandler)
+		[]byte("abcdef"), runtime.JobLow, jobHandler)
 	if err != nil {
 		t.Error(err)
 	}
@@ -89,7 +91,7 @@ func TestPoolStatus(t *testing.T) {
 		t.Errorf("The job (%s) shouldn't be running.", status.Handle)
 	}
 	addr, handle, err := pool.Do("Delay5sec",
-		[]byte("abcdef"), JobLow, nil)
+		[]byte("abcdef"), runtime.JobLow, nil)
 	if err != nil {
 		t.Error(err)
 		return

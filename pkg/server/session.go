@@ -62,31 +62,31 @@ func (self *session) handleConnection(s *Server, conn net.Conn) {
 
 		args, ok := decodeArgs(tp, buf)
 		if !ok {
-			log.Debug("tp:", CmdDescription(tp), "argc not match", "details:", string(buf))
+			log.Debug("tp:", tp.String(), "argc not match", "details:", string(buf))
 			return
 		}
 
-		log.Debug("sessionId", sessionId, "tp:", CmdDescription(tp), "len(args):", len(args), "details:", string(buf))
+		log.Debug("sessionId", sessionId, "tp:", tp.String(), "len(args):", len(args), "details:", string(buf))
 
 		switch tp {
-		case CAN_DO, CAN_DO_TIMEOUT: //todo: CAN_DO_TIMEOUT timeout support
+		case PT_CanDo, PT_CanDoTimeout: //todo: CAN_DO_TIMEOUT timeout support
 			self.w = self.getWorker(sessionId, inbox, conn)
 			s.protoEvtCh <- &event{tp: tp, args: &Tuple{
 				t0: self.w, t1: string(args[0])}}
-		case CANT_DO:
+		case PT_CantDo:
 			s.protoEvtCh <- &event{tp: tp, fromSessionId: sessionId,
 				args: &Tuple{t0: string(args[0])}}
-		case ECHO_REQ:
-			sendReply(inbox, ECHO_RES, [][]byte{buf})
-		case PRE_SLEEP:
+		case PT_EchoReq:
+			sendReply(inbox, PT_EchoRes, [][]byte{buf})
+		case PT_PreSleep:
 			self.w = self.getWorker(sessionId, inbox, conn)
 			s.protoEvtCh <- &event{tp: tp, args: &Tuple{t0: self.w}, fromSessionId: sessionId}
-		case SET_CLIENT_ID:
+		case PT_SetClientId:
 			self.w = self.getWorker(sessionId, inbox, conn)
 			s.protoEvtCh <- &event{tp: tp, args: &Tuple{t0: self.w, t1: string(args[0])}}
-		case GRAB_JOB_UNIQ:
+		case PT_GrabJobUniq:
 			if self.w == nil {
-				log.Errorf("can't perform %s, need send CAN_DO first", CmdDescription(tp))
+				log.Errorf("can't perform %s, need send CAN_DO first", tp.String())
 				return
 			}
 			e := &event{tp: tp, fromSessionId: sessionId,
@@ -100,9 +100,9 @@ func (self *session) handleConnection(s *Server, conn net.Conn) {
 			}
 
 			//log.Debugf("%+v", job)
-			sendReply(inbox, JOB_ASSIGN_UNIQ, [][]byte{
+			sendReply(inbox, PT_JobAssignUniq, [][]byte{
 				[]byte(job.Handle), []byte(job.FuncName), []byte(job.Id), job.Data})
-		case SUBMIT_JOB, SUBMIT_JOB_LOW_BG, SUBMIT_JOB_LOW:
+		case PT_SubmitJob, PT_SubmitJobLowBG, PT_SubmitJobLow:
 			if self.c == nil {
 				self.c = &Client{Session: Session{SessionId: sessionId, in: inbox,
 					ConnectAt: time.Now()}}
@@ -113,27 +113,27 @@ func (self *session) handleConnection(s *Server, conn net.Conn) {
 			}
 			s.protoEvtCh <- e
 			handle := <-e.result
-			sendReply(inbox, JOB_CREATED, [][]byte{[]byte(handle.(string))})
-		case GET_STATUS:
+			sendReply(inbox, PT_JobCreated, [][]byte{[]byte(handle.(string))})
+		case PT_GetStatus:
 			e := &event{tp: tp, args: &Tuple{t0: args[0]},
 				result: createResCh()}
 			s.protoEvtCh <- e
 
 			resp := (<-e.result).(*Tuple)
-			sendReply(inbox, STATUS_RES, [][]byte{resp.t0.([]byte),
+			sendReply(inbox, PT_StatusRes, [][]byte{resp.t0.([]byte),
 				bool2bytes(resp.t1), bool2bytes(resp.t2),
 				int2bytes(resp.t3),
 				int2bytes(resp.t4)})
-		case WORK_DATA, WORK_WARNING, WORK_STATUS, WORK_COMPLETE,
-			WORK_FAIL, WORK_EXCEPTION:
+		case PT_WorkData, PT_WorkWarning, PT_WorkStatus, PT_WorkComplete,
+			PT_WorkFail, PT_WorkException:
 			if self.w == nil {
-				log.Errorf("can't perform %s, need send CAN_DO first", CmdDescription(tp))
+				log.Errorf("can't perform %s, need send CAN_DO first", tp.String())
 				return
 			}
 			s.protoEvtCh <- &event{tp: tp, args: &Tuple{t0: args},
 				fromSessionId: sessionId}
 		default:
-			log.Warningf("not support type %s", CmdDescription(tp))
+			log.Warningf("not support type %s", tp.String())
 		}
 	}
 }

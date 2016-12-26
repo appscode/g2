@@ -23,14 +23,14 @@ type Server struct {
 	jobs       map[string]*Job
 
 	startSessionId int64
-	opCounter      map[uint32]int64
+	opCounter      map[PT]int64
 	store          storage.JobQueue
 	forwardReport  int64
 }
 
 var ( //const replys, to avoid building it every time
-	wakeupReply = constructReply(NOOP, nil)
-	nojobReply  = constructReply(NO_JOB, nil)
+	wakeupReply = constructReply(PT_Noop, nil)
+	nojobReply  = constructReply(PT_NoJob, nil)
 )
 
 func NewServer(store storage.JobQueue) *Server {
@@ -41,7 +41,7 @@ func NewServer(store storage.JobQueue) *Server {
 		worker:     make(map[int64]*Worker),
 		client:     make(map[int64]*Client),
 		jobs:       make(map[string]*Job),
-		opCounter:  make(map[uint32]int64),
+		opCounter:  make(map[PT]int64),
 		store:      store,
 	}
 }
@@ -189,9 +189,9 @@ func (self *Server) wakeupWorker(funcName string) bool {
 	return false
 }
 
-func (self *Server) checkAndRemoveJob(tp uint32, j *Job) {
+func (self *Server) checkAndRemoveJob(tp PT, j *Job) {
 	switch tp {
-	case WORK_COMPLETE, WORK_EXCEPTION, WORK_FAIL:
+	case PT_WorkComplete, PT_WorkException, PT_WorkFail:
 		self.removeJob(j)
 	}
 }
@@ -307,7 +307,7 @@ func (self *Server) handleCtrlEvt(e *event) (err error) {
 	case ctrlGetWorker:
 		return self.handleGetWorker(e)
 	default:
-		log.Warningf("%s, %d", CmdDescription(e.tp), e.tp)
+		log.Warningf("%s, %d", e.tp, e.tp)
 	}
 
 	return nil
@@ -345,10 +345,10 @@ func (self *Server) handleWorkReport(e *event) {
 	sessionId := e.fromSessionId
 	j, ok := self.worker[sessionId].runningJobs[jobhandle]
 
-	log.Debugf("%v job handle %v", CmdDescription(e.tp), jobhandle)
+	log.Debugf("%v job handle %v", e.tp, jobhandle)
 	if !ok {
 		log.Warningf("job information lost, %v job handle %v, %+v",
-			CmdDescription(e.tp), jobhandle, self.jobs)
+			e.tp, jobhandle, self.jobs)
 		return
 	}
 
@@ -356,7 +356,7 @@ func (self *Server) handleWorkReport(e *event) {
 		log.Fatal("job handle not match")
 	}
 
-	if WORK_STATUS == e.tp {
+	if PT_WorkStatus == e.tp {
 		j.Percent, _ = strconv.Atoi(string(slice[1]))
 		j.Denominator, _ = strconv.Atoi(string(slice[2]))
 	}
@@ -400,25 +400,25 @@ func (self *Server) handleProtoEvt(e *event) {
 	}
 
 	switch e.tp {
-	case CAN_DO:
+	case PT_CanDo:
 		w := args.t0.(*Worker)
 		funcName := args.t1.(string)
 		self.handleCanDo(funcName, w)
-	case CANT_DO:
+	case PT_CantDo:
 		sessionId := e.fromSessionId
 		funcName := args.t0.(string)
 		if jw, ok := self.funcWorker[funcName]; ok {
 			self.removeWorker(jw.workers, sessionId)
 		}
 		delete(self.worker[sessionId].canDo, funcName)
-	case SET_CLIENT_ID:
+	case PT_SetClientId:
 		w := args.t0.(*Worker)
 		w.workerId = args.t1.(string)
-	case CAN_DO_TIMEOUT: //todo: fix timeout support, now just as CAN_DO
+	case PT_CanDoTimeout: //todo: fix timeout support, now just as CAN_DO
 		w := args.t0.(*Worker)
 		funcName := args.t1.(string)
 		self.handleCanDo(funcName, w)
-	case GRAB_JOB_UNIQ:
+	case PT_GrabJobUniq:
 		sessionId := e.fromSessionId
 		w, ok := self.worker[sessionId]
 		if !ok {
@@ -439,7 +439,7 @@ func (self *Server) handleProtoEvt(e *event) {
 		}
 		//send job back
 		e.result <- j
-	case PRE_SLEEP:
+	case PT_PreSleep:
 		sessionId := e.fromSessionId
 		w, ok := self.worker[sessionId]
 		if !ok {
@@ -457,9 +457,9 @@ func (self *Server) handleProtoEvt(e *event) {
 				break
 			}
 		}
-	case SUBMIT_JOB, SUBMIT_JOB_LOW_BG, SUBMIT_JOB_LOW:
+	case PT_SubmitJob, PT_SubmitJobLowBG, PT_SubmitJobLow:
 		self.handleSubmitJob(e)
-	case GET_STATUS:
+	case PT_GetStatus:
 		jobhandle := bytes2str(args.t0)
 		if job, ok := self.jobs[jobhandle]; ok {
 			e.result <- &Tuple{t0: args.t0, t1: true, t2: job.Running,
@@ -469,11 +469,11 @@ func (self *Server) handleProtoEvt(e *event) {
 
 		e.result <- &Tuple{t0: args.t0, t1: false, t2: false,
 			t3: 0, t4: 100} //always set Denominator to 100 if no status update
-	case WORK_DATA, WORK_WARNING, WORK_STATUS, WORK_COMPLETE,
-		WORK_FAIL, WORK_EXCEPTION:
+	case PT_WorkData, PT_WorkWarning, PT_WorkStatus, PT_WorkComplete,
+		PT_WorkFail, PT_WorkException:
 		self.handleWorkReport(e)
 	default:
-		log.Warningf("%s, %d", CmdDescription(e.tp), e.tp)
+		log.Warningf("%s, %d", e.tp, e.tp)
 	}
 }
 
@@ -487,7 +487,7 @@ func (self *Server) wakeupTravel() {
 
 func (self *Server) pubCounter() {
 	for k, v := range self.opCounter {
-		stats.PubInt64(CmdDescription(k), v)
+		stats.PubInt64(k.String(), v)
 	}
 }
 

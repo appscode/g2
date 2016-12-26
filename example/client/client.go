@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/appscode/g2/client"
+	rt "github.com/appscode/g2/pkg/runtime"
 )
 
 func main() {
@@ -14,7 +15,7 @@ func main() {
 	// by implementing IdGenerator interface.
 	// client.IdGen = client.NewAutoIncId()
 
-	c, err := client.New(client.Network, "127.0.0.1:4730")
+	c, err := client.New(rt.Network, "127.0.0.1:4730")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -31,25 +32,25 @@ func main() {
 	log.Println(string(echomsg))
 	jobHandler := func(resp *client.Response) {
 		switch resp.DataType {
-		case client.WorkException:
+		case rt.PT_WorkException:
 			fallthrough
-		case client.WorkFail:
+		case rt.PT_WorkFail:
 			fallthrough
-		case client.WorkComplate:
+		case rt.PT_WorkComplete:
 			if data, err := resp.Result(); err == nil {
 				log.Printf("RESULT: %v\n", data)
 			} else {
 				log.Printf("RESULT: %s\n", err)
 			}
-		case client.WorkWarning:
+		case rt.PT_WorkWarning:
 			fallthrough
-		case client.WorkData:
+		case rt.PT_WorkData:
 			if data, err := resp.Update(); err == nil {
 				log.Printf("UPDATE: %v\n", data)
 			} else {
 				log.Printf("UPDATE: %v, %s\n", data, err)
 			}
-		case client.WorkStatus:
+		case rt.PT_WorkStatus:
 			if data, err := resp.Status(); err == nil {
 				log.Printf("STATUS: %v\n", data)
 			} else {
@@ -59,7 +60,7 @@ func main() {
 			log.Printf("UNKNOWN: %v", resp.Data)
 		}
 	}
-	handle, err := c.Do("ToUpper", echo, client.JobNormal, jobHandler)
+	handle, err := c.Do("ToUpper", echo, rt.JobNormal, jobHandler)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -69,7 +70,7 @@ func main() {
 	}
 	log.Printf("%v", *status)
 
-	_, err = c.Do("Foobar", echo, client.JobNormal, jobHandler)
+	_, err = c.Do("Foobar", echo, rt.JobNormal, jobHandler)
 	if err != nil {
 		log.Fatalln(err)
 	}

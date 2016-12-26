@@ -21,7 +21,7 @@ func TestDecodeArgs(t *testing.T) {
 		0x72, 0x65, 0x76, 0x65, 0x72, 0x73, 0x65, 0x00,
 		0x00,
 		0x74, 0x65, 0x73, 0x74}
-	slice, ok := decodeArgs(SUBMIT_JOB, data)
+	slice, ok := decodeArgs(PT_SubmitJob, data)
 	if !ok {
 		t.Error("should be true")
 	}
@@ -48,7 +48,7 @@ func TestDecodeArgs(t *testing.T) {
 		0x30,
 	}
 
-	slice, ok = decodeArgs(WORK_COMPLETE, data)
+	slice, ok = decodeArgs(PT_WorkComplete, data)
 	if !ok {
 		t.Error("should be true")
 	}

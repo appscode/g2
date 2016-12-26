@@ -7,6 +7,8 @@ import (
 	"io"
 	"net"
 	"sync"
+
+	rt "github.com/appscode/g2/pkg/runtime"
 )
 
 // The agent of job server.
@@ -25,7 +27,7 @@ func newAgent(net, addr string, worker *Worker) (a *agent, err error) {
 		net:    net,
 		addr:   addr,
 		worker: worker,
-		in:     make(chan []byte, queueSize),
+		in:     make(chan []byte, rt.QueueSize),
 	}
 	return
 }
@@ -87,7 +89,7 @@ func (a *agent) work() {
 			if len(leftdata) > 0 { // some data left for processing
 				data = append(leftdata, data...)
 			}
-			if len(data) < minPacketLength { // not enough data
+			if len(data) < rt.MinPacketLength { // not enough data
 				leftdata = data
 				continue
 			}
@@ -139,7 +141,7 @@ func (a *agent) Grab() {
 
 func (a *agent) grab() {
 	outpack := getOutPack()
-	outpack.dataType = dtGrabJobUniq
+	outpack.dataType = rt.PT_GrabJobUniq
 	a.write(outpack)
 }
 
@@ -147,7 +149,7 @@ func (a *agent) PreSleep() {
 	a.Lock()
 	defer a.Unlock()
 	outpack := getOutPack()
-	outpack.dataType = dtPreSleep
+	outpack.dataType = rt.PT_PreSleep
 	a.write(outpack)
 }
 
@@ -172,7 +174,7 @@ func (a *agent) reconnect() error {
 func (a *agent) read() (data []byte, err error) {
 	n := 0
 
-	tmp := getBuffer(bufferSize)
+	tmp := rt.NewBuffer(rt.BufferSize)
 	var buf bytes.Buffer
 
 	// read the header so we can get the length of the data
@@ -185,7 +187,7 @@ func (a *agent) read() (data []byte, err error) {
 	buf.Write(tmp[:n])
 
 	// read until we receive all the data
-	for buf.Len() < dl+minPacketLength {
+	for buf.Len() < dl+rt.MinPacketLength {
 		if n, err = a.rw.Read(tmp); err != nil {
 			return buf.Bytes(), err
 		}

@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strconv"
+
+	rt "github.com/appscode/g2/pkg/runtime"
 )
 
 // Response handler
@@ -12,7 +14,7 @@ type ResponseHandler func(*Response)
 
 // response
 type Response struct {
-	DataType  uint32
+	DataType  rt.PT
 	Data, UID []byte
 	Handle    string
 }
@@ -24,14 +26,14 @@ type Response struct {
 // after calling this method, the Response.Handle will be filled
 func (resp *Response) Result() (data []byte, err error) {
 	switch resp.DataType {
-	case dtWorkFail:
+	case rt.PT_WorkFail:
 		resp.Handle = string(resp.Data)
 		err = ErrWorkFail
 		return
-	case dtWorkException:
+	case rt.PT_WorkException:
 		err = ErrWorkException
 		fallthrough
-	case dtWorkComplete:
+	case rt.PT_WorkComplete:
 		data = resp.Data
 	default:
 		err = ErrDataType
@@ -41,13 +43,13 @@ func (resp *Response) Result() (data []byte, err error) {
 
 // Extract the job's update
 func (resp *Response) Update() (data []byte, err error) {
-	if resp.DataType != dtWorkData &&
-		resp.DataType != dtWorkWarning {
+	if resp.DataType != rt.PT_WorkData &&
+		resp.DataType != rt.PT_WorkWarning {
 		err = ErrDataType
 		return
 	}
 	data = resp.Data
-	if resp.DataType == dtWorkWarning {
+	if resp.DataType == rt.PT_WorkWarning {
 		err = ErrWorkWarning
 	}
 	return
@@ -56,27 +58,30 @@ func (resp *Response) Update() (data []byte, err error) {
 // Decode a job from byte slice
 func decodeResponse(data []byte) (resp *Response, l int, err error) {
 	a := len(data)
-	if a < minPacketLength { // valid package should not less 12 bytes
+	if a < rt.MinPacketLength { // valid package should not less 12 bytes
 		err = fmt.Errorf("Invalid data: %v", data)
 		return
 	}
 	dl := int(binary.BigEndian.Uint32(data[8:12]))
-	if a < minPacketLength+dl {
+	if a < rt.MinPacketLength+dl {
 		err = fmt.Errorf("Invalid data: %v", data)
 		return
 	}
-	dt := data[minPacketLength : dl+minPacketLength]
+	dt := data[rt.MinPacketLength : dl+rt.MinPacketLength]
 	if len(dt) != int(dl) { // length not equal
 		err = fmt.Errorf("Invalid data: %v", data)
 		return
 	}
 	resp = getResponse()
-	resp.DataType = binary.BigEndian.Uint32(data[4:8])
+	resp.DataType, err = rt.NewPT(binary.BigEndian.Uint32(data[4:8]))
+	if err != nil {
+		return
+	}
 	switch resp.DataType {
-	case dtJobCreated:
+	case rt.PT_JobCreated:
 		resp.Handle = string(dt)
-	case dtStatusRes, dtWorkData, dtWorkWarning, dtWorkStatus,
-		dtWorkComplete, dtWorkException:
+	case rt.PT_StatusRes, rt.PT_WorkData, rt.PT_WorkWarning, rt.PT_WorkStatus,
+		rt.PT_WorkComplete, rt.PT_WorkException:
 		s := bytes.SplitN(dt, []byte{'\x00'}, 2)
 		if len(s) >= 2 {
 			resp.Handle = string(s[0])
@@ -85,7 +90,7 @@ func decodeResponse(data []byte) (resp *Response, l int, err error) {
 			err = fmt.Errorf("Invalid data: %v", data)
 			return
 		}
-	case dtWorkFail:
+	case rt.PT_WorkFail:
 		s := bytes.SplitN(dt, []byte{'\x00'}, 2)
 		if len(s) >= 1 {
 			resp.Handle = string(s[0])
@@ -93,12 +98,12 @@ func decodeResponse(data []byte) (resp *Response, l int, err error) {
 			err = fmt.Errorf("Invalid data: %v", data)
 			return
 		}
-	case dtEchoRes:
+	case rt.PT_EchoRes:
 		fallthrough
 	default:
 		resp.Data = dt
 	}
-	l = dl + minPacketLength
+	l = dl + rt.MinPacketLength
 	return
 }
 

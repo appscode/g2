@@ -3,23 +3,25 @@ package worker
 import (
 	"bytes"
 	"testing"
+
+	rt "github.com/appscode/g2/pkg/runtime"
 )
 
 var (
 	inpackcases = map[uint32]map[string]string{
-		dtNoop: {
+		rt.PT_Noop: {
 			"src": "\x00RES\x00\x00\x00\x06\x00\x00\x00\x00",
 		},
-		dtNoJob: {
+		rt.PT_NoJob: {
 			"src": "\x00RES\x00\x00\x00\x0a\x00\x00\x00\x00",
 		},
-		dtJobAssign: {
+		rt.PT_JobAssign: {
 			"src":    "\x00RES\x00\x00\x00\x0b\x00\x00\x00\x07a\x00b\x00xyz",
 			"handle": "a",
 			"fn":     "b",
 			"data":   "xyz",
 		},
-		dtJobAssignUniq: {
+		rt.PT_JobAssignUniq: {
 			"src":    "\x00RES\x00\x00\x00\x1F\x00\x00\x00\x09a\x00b\x00c\x00xyz",
 			"handle": "a",
 			"fn":     "b",

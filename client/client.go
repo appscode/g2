@@ -7,6 +7,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	rt "github.com/appscode/g2/pkg/runtime"
 )
 
 var (
@@ -36,7 +38,7 @@ type responseHandlerMap struct {
 }
 
 func newResponseHandlerMap() *responseHandlerMap {
-	return &responseHandlerMap{holder: make(map[string]ResponseHandler, queueSize)}
+	return &responseHandlerMap{holder: make(map[string]ResponseHandler, rt.QueueSize)}
 }
 
 func (r *responseHandlerMap) remove(key string) {
@@ -64,7 +66,7 @@ func New(network, addr string) (client *Client, err error) {
 		addr:            addr,
 		respHandler:     newResponseHandlerMap(),
 		innerHandler:    newResponseHandlerMap(),
-		in:              make(chan *Response, queueSize),
+		in:              make(chan *Response, rt.QueueSize),
 		ResponseTimeout: DefaultTimeout,
 	}
 	client.conn, err = net.Dial(client.net, client.addr)
@@ -92,14 +94,14 @@ func (client *Client) write(req *request) (err error) {
 
 func (client *Client) read(length int) (data []byte, err error) {
 	n := 0
-	buf := getBuffer(bufferSize)
+	buf := rt.NewBuffer(rt.BufferSize)
 	// read until data can be unpacked
-	for i := length; i > 0 || len(data) < minPacketLength; i -= n {
+	for i := length; i > 0 || len(data) < rt.MinPacketLength; i -= n {
 		if n, err = client.rw.Read(buf); err != nil {
 			return
 		}
 		data = append(data, buf[0:n]...)
-		if n < bufferSize {
+		if n < rt.BufferSize {
 			break
 		}
 	}
@@ -113,7 +115,7 @@ func (client *Client) readLoop() {
 	var resp *Response
 ReadLoop:
 	for client.conn != nil {
-		if data, err = client.read(bufferSize); err != nil {
+		if data, err = client.read(rt.BufferSize); err != nil {
 			if opErr, ok := err.(*net.OpError); ok {
 				if opErr.Timeout() {
 					client.err(err)
@@ -143,7 +145,7 @@ ReadLoop:
 		}
 		for {
 			l := len(data)
-			if l < minPacketLength { // not enough data
+			if l < rt.MinPacketLength { // not enough data
 				leftdata = data
 				continue ReadLoop
 			}
@@ -165,22 +167,22 @@ ReadLoop:
 func (client *Client) processLoop() {
 	for resp := range client.in {
 		switch resp.DataType {
-		case dtError:
+		case rt.PT_Error:
 			if client.lastcall != "" {
 				resp = client.handleInner(client.lastcall, resp)
 				client.lastcall = ""
 			} else {
 				client.err(getError(resp.Data))
 			}
-		case dtStatusRes:
+		case rt.PT_StatusRes:
 			resp = client.handleInner("s"+resp.Handle, resp)
-		case dtJobCreated:
+		case rt.PT_JobCreated:
 			resp = client.handleInner("c", resp)
-		case dtEchoRes:
+		case rt.PT_EchoRes:
 			resp = client.handleInner("e", resp)
-		case dtWorkData, dtWorkWarning, dtWorkStatus:
+		case rt.PT_WorkData, rt.PT_WorkWarning, rt.PT_WorkStatus:
 			resp = client.handleResponse(resp.Handle, resp)
-		case dtWorkComplete, dtWorkFail, dtWorkException:
+		case rt.PT_WorkComplete, rt.PT_WorkFail, rt.PT_WorkException:
 			client.handleResponse(resp.Handle, resp)
 			client.respHandler.remove(resp.Handle)
 		}
@@ -215,15 +217,14 @@ type handleOrError struct {
 	err    error
 }
 
-func (client *Client) do(funcname string, data []byte,
-	flag uint32) (handle string, err error) {
+func (client *Client) do(funcname string, data []byte, flag rt.PT) (handle string, err error) {
 	if client.conn == nil {
 		return "", ErrLostConn
 	}
 	var result = make(chan handleOrError, 1)
 	client.lastcall = "c"
 	client.innerHandler.put("c", func(resp *Response) {
-		if resp.DataType == dtError {
+		if resp.DataType == rt.PT_Error {
 			err = getError(resp.Data)
 			result <- handleOrError{"", err}
 			return
@@ -255,14 +256,14 @@ func (client *Client) do(funcname string, data []byte,
 // flag can be set to: JobLow, JobNormal and JobHigh
 func (client *Client) Do(funcname string, data []byte,
 	flag byte, h ResponseHandler) (handle string, err error) {
-	var datatype uint32
+	var datatype rt.PT
 	switch flag {
-	case JobLow:
-		datatype = dtSubmitJobLow
-	case JobHigh:
-		datatype = dtSubmitJobHigh
+	case rt.JobLow:
+		datatype = rt.PT_SubmitJobLow
+	case rt.JobHigh:
+		datatype = rt.PT_SubmitJobHigh
 	default:
-		datatype = dtSubmitJob
+		datatype = rt.PT_SubmitJob
 	}
 	handle, err = client.do(funcname, data, datatype)
 	if err == nil && h != nil {
@@ -278,14 +279,14 @@ func (client *Client) DoBg(funcname string, data []byte,
 	if client.conn == nil {
 		return "", ErrLostConn
 	}
-	var datatype uint32
+	var datatype rt.PT
 	switch flag {
-	case JobLow:
-		datatype = dtSubmitJobLowBg
-	case JobHigh:
-		datatype = dtSubmitJobHighBg
+	case rt.JobLow:
+		datatype = rt.PT_SubmitJobLowBG
+	case rt.JobHigh:
+		datatype = rt.PT_SubmitJobHighBG
 	default:
-		datatype = dtSubmitJobBg
+		datatype = rt.PT_SubmitJobBG
 	}
 	handle, err = client.do(funcname, data, datatype)
 	return
@@ -308,7 +309,7 @@ func (client *Client) Status(handle string) (status *Status, err error) {
 		}
 	})
 	req := getRequest()
-	req.DataType = dtGetStatus
+	req.DataType = rt.PT_GetStatus
 	req.Data = []byte(handle)
 	client.write(req)
 	mutex.Lock()
@@ -327,7 +328,7 @@ func (client *Client) Echo(data []byte) (echo []byte, err error) {
 		mutex.Unlock()
 	})
 	req := getRequest()
-	req.DataType = dtEchoReq
+	req.DataType = rt.PT_EchoReq
 	req.Data = data
 	client.lastcall = "e"
 	client.write(req)

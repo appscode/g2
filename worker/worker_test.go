@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/appscode/g2/client"
+	rt "github.com/appscode/g2/pkg/runtime"
 )
 
 var worker *Worker
@@ -25,7 +26,7 @@ func TestWorkerErrNoneAgents(t *testing.T) {
 
 func TestWorkerAddServer(t *testing.T) {
 	t.Log("Add local server 127.0.0.1:4730.")
-	if err := worker.AddServer(Network, "127.0.0.1:4730"); err != nil {
+	if err := worker.AddServer(rt.Network, "127.0.0.1:4730"); err != nil {
 		t.Error(err)
 	}
 
@@ -86,7 +87,7 @@ func TestLargeDataWork(t *testing.T) {
 	worker := New(Unlimited)
 	defer worker.Close()
 
-	if err := worker.AddServer(Network, "127.0.0.1:4730"); err != nil {
+	if err := worker.AddServer(rt.Network, "127.0.0.1:4730"); err != nil {
 		t.Error(err)
 	}
 	worker.Ready()
@@ -145,7 +146,7 @@ func TestWorkerClose(t *testing.T) {
 func TestWorkWithoutReady(t *testing.T) {
 	other_worker := New(Unlimited)
 
-	if err := other_worker.AddServer(Network, "127.0.0.1:4730"); err != nil {
+	if err := other_worker.AddServer(rt.Network, "127.0.0.1:4730"); err != nil {
 		t.Error(err)
 	}
 	if err := other_worker.AddFunc("gearman-go-workertest", foobar, 0); err != nil {
@@ -231,7 +232,7 @@ func TestDisableWorkersAndCountRunningJobs(t *testing.T) {
 	worker := New(Unlimited)
 	defer worker.Close()
 
-	if err := worker.AddServer(Network, "127.0.0.1:4730"); err != nil {
+	if err := worker.AddServer(rt.Network, "127.0.0.1:4730"); err != nil {
 		t.Error(err)
 	}
 	worker.Ready()
@@ -263,7 +264,7 @@ func TestDisableWorkersAndCountRunningJobs(t *testing.T) {
 
 	var cli *client.Client
 	var err error
-	if cli, err = client.New(client.Network, "127.0.0.1:4730"); err != nil {
+	if cli, err = client.New(rt.Network, "127.0.0.1:4730"); err != nil {
 		t.Fatal(err)
 	}
 	cli.ErrorHandler = func(e error) {
@@ -273,14 +274,14 @@ func TestDisableWorkersAndCountRunningJobs(t *testing.T) {
 	worker.Disable()
 	if worker.IsDisabled() {
 		wg.Add(1)
-		_, err = cli.Do("handler", bytes.Repeat([]byte("a"), 50), client.JobHigh, func(res *client.Response) {
+		_, err = cli.Do("handler", bytes.Repeat([]byte("a"), 50), rt.JobHigh, func(res *client.Response) {
 		})
 		if err != nil {
 			t.Error(err)
 		}
 
 		wg.Add(1)
-		_, err = cli.Do("handler", bytes.Repeat([]byte("a"), 50), client.JobHigh, func(res *client.Response) {
+		_, err = cli.Do("handler", bytes.Repeat([]byte("a"), 50), rt.JobHigh, func(res *client.Response) {
 		})
 		if err != nil {
 			t.Error(err)
@@ -300,7 +301,7 @@ func TestDisableWorkersAndCountRunningJobs(t *testing.T) {
 
 		time.Sleep(time.Second * 50)
 		wg.Add(1)
-		_, err = cli.Do("handler", bytes.Repeat([]byte("a"), 50), client.JobHigh, func(res *client.Response) {
+		_, err = cli.Do("handler", bytes.Repeat([]byte("a"), 50), rt.JobHigh, func(res *client.Response) {
 		})
 		if err != nil {
 			t.Error(err)

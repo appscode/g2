@@ -1,5 +1,7 @@
 package runtime
 
+import "fmt"
+
 /*
 Binary Packet
 -------------
@@ -70,11 +72,11 @@ NULL byte separator. All job handle arguments must not be longer than
 const (
 	Network = "tcp"
 	// queue size
-	queueSize = 8
+	QueueSize = 8
 	// read buffer size
-	bufferSize = 1024
+	BufferSize = 4096
 	// min packet length
-	minPacketLength = 12
+	MinPacketLength = 12
 
 	// \x00REQ
 	Req    = 5391697
@@ -95,56 +97,84 @@ const (
 	JobHigh
 )
 
+type PT uint32
+
 const (
-	CAN_DO          = iota + 1 //   1            REQ    Worker
-	CANT_DO                    //   REQ    Worker
-	RESET_ABILITIES            //   REQ    Worker
-	PRE_SLEEP                  //   REQ    Worker
-	UNUSED                     //   -      -
-	NOOP                       //   RES    Worker
-	SUBMIT_JOB                 //   REQ    Client
-	JOB_CREATED                //   RES    Client
-	GRAB_JOB                   //   REQ    Worker
-	NO_JOB                     //   RES    Worker
-	JOB_ASSIGN                 //   RES    Worker
-	WORK_STATUS                //   REQ    Worker
+	PT_CanDo          PT = iota + 1 //   1            REQ    Worker
+	PT_CantDo                       //   REQ    Worker
+	PT_ResetAbilities               //   REQ    Worker
+	PT_PreSleep                     //   REQ    Worker
+	_
+	PT_Noop       //   RES    Worker
+	PT_SubmitJob  //   REQ    Client
+	PT_JobCreated //   RES    Client
+	PT_GrabJob    //   REQ    Worker
+	PT_NoJob      //   RES    Worker
+	PT_JobAssign  //   RES    Worker
+	PT_WorkStatus //   REQ    Worker
 
 	//     RES    Client
-	WORK_COMPLETE //   REQ    Worker
+	PT_WorkComplete //   REQ    Worker
 
 	//    RES    Client
-	WORK_FAIL //  REQ    Worker
+	PT_WorkFail //  REQ    Worker
 
 	//    RES    Client
-	GET_STATUS //   REQ    Client
+	PT_GetStatus //   REQ    Client
 
-	ECHO_REQ        //  REQ    Client/Worker
-	ECHO_RES        //  RES    Client/Worker
-	SUBMIT_JOB_BG   //   REQ    Client
-	ERROR           //   RES    Client/Worker
-	STATUS_RES      //   RES    Client
-	SUBMIT_JOB_HIGH //   REQ    Client
-	SET_CLIENT_ID   //  REQ    Worker
-	CAN_DO_TIMEOUT  //   REQ    Worker
-	ALL_YOURS       //   REQ    Worker
-	WORK_EXCEPTION  //   REQ    Worker
+	PT_EchoReq       //  REQ    Client/Worker
+	PT_EchoRes       //  RES    Client/Worker
+	PT_SubmitJobBG   //   REQ    Client
+	PT_Error         //   RES    Client/Worker
+	PT_StatusRes     //   RES    Client
+	PT_SubmitJobHigh //   REQ    Client
+	PT_SetClientId   //  REQ    Worker
+	PT_CanDoTimeout  //   REQ    Worker
+	PT_AllYours      //   REQ    Worker
+	PT_WorkException //   REQ    Worker
 
 	//     RES    Client
-	OPTION_REQ //   REQ    Client/Worker
+	PT_OptionReq //   REQ    Client/Worker
 
-	OPTION_RES //   RES    Client/Worker
-	WORK_DATA  //   REQ    Worker
-
-	//    RES    Client
-	WORK_WARNING //  REQ    Worker
+	PT_OptionRes //   RES    Client/Worker
+	PT_WorkData  //   REQ    Worker
 
 	//    RES    Client
-	GRAB_JOB_UNIQ //   REQ    Worker
+	PT_WorkWarning //  REQ    Worker
 
-	JOB_ASSIGN_UNIQ    //   RES    Worker
-	SUBMIT_JOB_HIGH_BG //  REQ    Client
-	SUBMIT_JOB_LOW     //  REQ    Client
-	SUBMIT_JOB_LOW_BG  //  REQ    Client
-	SUBMIT_JOB_SCHED   //  REQ    Client
-	SUBMIT_JOB_EPOCH   //   36 REQ    Client
+	//    RES    Client
+	PT_GrabJobUniq //   REQ    Worker
+
+	PT_JobAssignUniq   //   RES    Worker
+	PT_SubmitJobHighBG //  REQ    Client
+	PT_SubmitJobLow    //  REQ    Client
+	PT_SubmitJobLowBG  //  REQ    Client
+	PT_SubmitJobSched  //  REQ    Client
+	PT_SubmitJobEpoch  //   36 REQ    Client
+
+	// New Codes (ref: https://github.com/gearman/gearmand/commit/eabf8a01030a16c80bada1e06c4162f8d129a5e8)
+	PT_SubmitReduceJob           // REQ    Client
+	PT_SubmitReduceJobBackground // REQ    Client
+	PT_GrabJobAll                // REQ    Worker
+	PT_JobAssignAll              // RES    Worker
+	PT_GetStatusUnique           // REQ    Client
+	PT_StatusResUnique           // RES    Client
 )
+
+func (i PT) Int() int {
+	return int(i)
+}
+
+func (i PT) Uint32() uint32 {
+	return uint32(i)
+}
+
+func NewPT(cmd uint32) (PT, error) {
+	if cmd >= PT_CanDo.Uint32() && cmd <= PT_SubmitJobEpoch.Uint32() {
+		return PT(cmd), nil
+	}
+	if cmd >= PT_SubmitReduceJob.Uint32() && cmd <= PT_StatusResUnique.Uint32() {
+		return PT(cmd), fmt.Errorf("Unsupported packet type %v", cmd)
+	}
+	return PT(cmd), fmt.Errorf("Invalid packet type %v", cmd)
+}
