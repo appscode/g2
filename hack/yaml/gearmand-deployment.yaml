@@ -1,0 +1,40 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: gearmand-deployment
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: gearmand
+    spec:
+      containers:
+        - image: appscode/gearmand:0.1.0
+          imagePullPolicy: Always
+          name: gearmand-go
+          ports:
+            - containerPort: 4730
+              name: http
+              protocol: TCP
+          volumeMounts:
+            - name: data-volume
+              mountPath: /var/db
+        - image: appscode/postgres:9.5-db
+          imagePullPolicy: Always
+          name: postgres
+          ports:
+            - containerPort: 5432
+              name: postgres
+              protocol: TCP
+          args:
+            - basic
+            - /var/db/schema/setup-db.sh
+          volumeMounts:
+            - name: data-volume
+              mountPath: /var/db
+      volumes:
+        - name: data-volume
+          gcePersistentDisk:
+            pdName: gearman-pd
+            fsType: ext4

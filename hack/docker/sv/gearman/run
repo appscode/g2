@@ -1,0 +1,15 @@
+#!/bin/bash
+exec 1> >(logger -s -p daemon.info -t ${PWD##*/})
+exec 2> >(logger -s -p daemon.error -t ${PWD##*/})
+source /etc/envvars
+
+QUEUE="-q Postgres --libpq-table=gearman_queue"
+# http://stackoverflow.com/questions/228544/how-to-tell-if-a-string-is-not-defined-in-a-bash-shell-script
+if [ -z "${PGHOST+xxx}" ]; then
+	QUEUE=""
+fi
+LEVEL=${LEVEL:-INFO}
+
+echo "Starting gearman job server ..."
+# exec /usr/sbin/gearmand --listen=0.0.0.0 $QUEUE -l /dev/stdout --verbose $LEVEL
+exec /gearmand --addr=0.0.0.0:4730
