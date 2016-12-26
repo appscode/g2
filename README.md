@@ -21,7 +21,7 @@ Install
 Install the client package:
 
 > $ go get github.com/appscode/g2/client
-	
+
 Install the worker package:
 
 > $ go get github.com/appscode/g2/worker
@@ -32,11 +32,43 @@ Both of them:
 
 Usage
 =====
+## Server
+	how to start gearmand?
+
+	./gearmand --addr="0.0.0.0:4730"
+
+	how to not use leveldb as storage?
+
+	./gearmand --storage-dir= --addr="0.0.0.0:4730"
+
+how to track stats:
+
+	http://localhost:3000/debug/stats
+
+how to list workers by "cando" ?
+
+	http://localhost:3000/worker/function
+
+how to list all workers ?
+
+	http://localhost:3000/worker
+
+how to query job status ?
+
+	http://localhost:3000/job/jobhandle
+
+how to list all jobs ?
+
+	http://localhost:3000/job
+
+how to change monitor address ?
+
+	export GEARMAND_MONITOR_ADDR=:4567
 
 ## Worker
 
 ```go
-// Limit number of concurrent jobs execution. 
+// Limit number of concurrent jobs execution.
 // Use worker.Unlimited (0) if you want no limitation.
 w := worker.New(worker.OneByOne)
 w.ErrHandler = func(e error) {
@@ -73,7 +105,7 @@ jobHandler := func(resp *client.Response) {
 	log.Printf("%s", resp.Data)
 }
 handle, err := c.Do("ToUpper", echo, client.JobNormal, jobHandler)
-// ...	
+// ...
 ```
 
 Acknowledgement
