@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/mikespook/gearman-go/client"
+	"github.com/appscode/g2/client"
 	"log"
 	"os"
 	"sync"

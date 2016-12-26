@@ -1,36 +1,34 @@
-Gearman-Go
+G2
 ==========
 
-This module is a [Gearman](http://gearman.org/) API for the [Go Programming Language](http://golang.org).
-The protocols were written in pure Go. It contains two sub-packages:
+G2 is a server, worker and client implementation of [Gearman](http://gearman.org/) in [Go Programming Language](http://golang.org). It contains two sub-packages:
 
 The client package is used for sending jobs to the Gearman job server,
 and getting responses from the server.
 
-	"github.com/mikespook/gearman-go/client"
+	"github.com/appscode/g2/client"
 
 The worker package will help developers in developing Gearman worker
 service easily.
 
-	"github.com/mikespook/gearman-go/worker"
+	"github.com/appscode/g2/worker"
 
-[![Build Status](https://travis-ci.org/mikespook/gearman-go.png?branch=master)](https://travis-ci.org/mikespook/gearman-go)
-[![GoDoc](https://godoc.org/github.com/mikespook/gearman-go?status.png)](https://godoc.org/github.com/mikespook/gearman-go)
+[![GoDoc](https://godoc.org/github.com/appscode/g2?status.png)](https://godoc.org/github.com/appscode/g2)
 
 Install
 =======
 
 Install the client package:
 
-> $ go get github.com/mikespook/gearman-go/client
+> $ go get github.com/appscode/g2/client
 	
 Install the worker package:
 
-> $ go get github.com/mikespook/gearman-go/worker
+> $ go get github.com/appscode/g2/worker
 
 Both of them:
 
-> $ go get github.com/mikespook/gearman-go
+> $ go get github.com/appscode/g2
 
 Usage
 =====
@@ -78,43 +76,11 @@ handle, err := c.Do("ToUpper", echo, client.JobNormal, jobHandler)
 // ...	
 ```
 
-Branches
-========
-
-Version 0.x means: _It is far far away from stable._
-
-__Use at your own risk!__
-
- * master current usable version
- * 0.2-dev Refactoring a lot of things
- * 0.1-testing Old API and some known issues, eg. [issue-14](https://github.com/mikespook/gearman-go/issues/14)
-
-Contributors
-============
-
-Great thanks to all of you for your support and interest!
-
-(_Alphabetic order_)
- 
- * [Alex Zylman](https://github.com/azylman)
- * [C.R. Kirkwood-Watts](https://github.com/kirkwood)
- * [Damian Gryski](https://github.com/dgryski)
- * [Gabriel Cristian Alecu](https://github.com/AzuraMeta)
- * [Graham Barr](https://github.com/gbarr)
- * [Ingo Oeser](https://github.com/nightlyone)
- * [jake](https://github.com/jbaikge)
- * [Joe Higton](https://github.com/draxil)
- * [Jonathan Wills](https://github.com/runningwild)
- * [Kevin Darlington](https://github.com/kdar)
- * [miraclesu](https://github.com/miraclesu)
- * [Paul Mach](https://github.com/paulmach)
- * [Randall McPherson](https://github.com/rlmcpherson)
- * [Sam Grimee](https://github.com/sgrimee)
-
-Maintainer
+Acknowledgement
 ==========
-
- * [Xing Xing](http://mikespook.com) &lt;<mikespook@gmail.com>&gt; [@Twitter](http://twitter.com/mikespook)
+ * Client and Worker package forked from https://github.com/mikespook/gearman-go
+ * Server package forked from https://github.com/ngaut/gearmand
+ * Gearman project (http://gearman.org/protocol/)
 
 Open Source - MIT Software License
 ==================================

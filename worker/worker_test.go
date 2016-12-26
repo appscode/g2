@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 	"time"
-	"github.com/mikespook/gearman-go/client"
+	"github.com/appscode/g2/client"
 	"fmt"
 )
 
