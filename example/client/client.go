@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/appscode/g2/client"
 	"log"
 	"os"
 	"sync"
+
+	"github.com/appscode/g2/client"
 )
 
 func main() {

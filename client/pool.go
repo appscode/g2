@@ -38,7 +38,7 @@ func SelectRandom(pool map[string]*PoolClient,
 	last string) (addr string) {
 	r := rand.Intn(len(pool))
 	i := 0
-	for k, _ := range pool {
+	for k := range pool {
 		if r == i {
 			return k
 		}

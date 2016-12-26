@@ -1,0 +1,8 @@
+package: github.com/appscode/g2
+import:
+- package: gopkg.in/macaron.v1
+  version: v1.1.11
+- package: github.com/mikespook/golib
+- package: github.com/ngaut/logging
+- package: github.com/ngaut/stats
+- package: github.com/syndtr/goleveldb

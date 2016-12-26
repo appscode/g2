@@ -2,11 +2,12 @@ package worker
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
+
 	"github.com/appscode/g2/client"
-	"fmt"
 )
 
 var worker *Worker
@@ -238,7 +239,7 @@ func TestDisableWorkersAndCountRunningJobs(t *testing.T) {
 	var wg sync.WaitGroup
 	handler := func(job Job) ([]byte, error) {
 		fmt.Println("running job")
-		time.Sleep(time.Second*20)
+		time.Sleep(time.Second * 20)
 		fmt.Println("done")
 		wg.Done()
 		return nil, nil
@@ -285,19 +286,19 @@ func TestDisableWorkersAndCountRunningJobs(t *testing.T) {
 			t.Error(err)
 		}
 
-		go func () {
+		go func() {
 			for {
-				time.Sleep(time.Second*10)
+				time.Sleep(time.Second * 10)
 				if worker.Count() > 0 {
 					fmt.Println("worker enabled", worker.Count())
-					break;
+					break
 				} else {
 					fmt.Println("worker do not have any jobs")
 				}
 			}
 		}()
 
-		time.Sleep(time.Second*50)
+		time.Sleep(time.Second * 50)
 		wg.Add(1)
 		_, err = cli.Do("handler", bytes.Repeat([]byte("a"), 50), client.JobHigh, func(res *client.Response) {
 		})

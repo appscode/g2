@@ -1,12 +1,13 @@
 package worker
 
 import (
-	"../client"
 	"log"
 	"net"
 	"os/exec"
 	"testing"
 	"time"
+
+	"../client"
 )
 
 const port = `3700`

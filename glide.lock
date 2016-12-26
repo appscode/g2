@@ -1,0 +1,50 @@
+hash: 246486dc2d222b86252763b9de21923f960955f0ffa6a47ef13f839108cdcbaf
+updated: 2016-12-25T19:54:37.649758469-08:00
+imports:
+- name: github.com/codegangsta/inject
+  version: 33e0aa1cb7c019ccc3fbe049a8262a6403d30504
+- name: github.com/go-macaron/inject
+  version: d8a0b8677191f4380287cfebd08e462217bac7ad
+- name: github.com/go-macaron/toolbox
+  version: 99a42f20e9e88daec5c0d7beb4e7eac134680ab0
+- name: github.com/go-martini/martini
+  version: fe605b5cd210047ae3bb73d2b69a5b912a9b423d
+- name: github.com/golang/snappy
+  version: d9eb7a3d35ec988b8585d4a0068e462c27d28380
+- name: github.com/mikespook/golib
+  version: 38fe6917d34b267a79c3432369e7dcc379e2d5b3
+  subpackages:
+  - autoinc
+  - idgen
+  - signal
+- name: github.com/ngaut/logging
+  version: f98f5f4cd523647678af6f1726c5b5a14c9193d0
+- name: github.com/ngaut/stats
+  version: 8564f986a400931e52c2261e4b784d812c854537
+- name: github.com/syndtr/goleveldb
+  version: 6b4daa5362b502898ddf367c5c11deb9e7a5c727
+  subpackages:
+  - leveldb
+  - leveldb/cache
+  - leveldb/comparer
+  - leveldb/errors
+  - leveldb/filter
+  - leveldb/iterator
+  - leveldb/journal
+  - leveldb/memdb
+  - leveldb/opt
+  - leveldb/storage
+  - leveldb/table
+  - leveldb/util
+- name: github.com/Unknwon/com
+  version: 28b053d5a2923b87ce8c5a08f3af779894a72758
+- name: gopkg.in/ini.v1
+  version: 6e4869b434bd001f6983749881c7ead3545887d8
+- name: gopkg.in/macaron.v1
+  version: ddb19a9f3e8cedd44696b9dd5854dc8a43f3dd6c
+- name: gopkg.in/mgo.v2
+  version: 3f83fa5005286a7fe593b055f0d7771a7dce4655
+  subpackages:
+  - bson
+  - internal/json
+testImports: []

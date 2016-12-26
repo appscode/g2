@@ -2,8 +2,9 @@ package worker_test
 
 import (
 	"fmt"
-	"github.com/appscode/g2/worker"
 	"sync"
+
+	"github.com/appscode/g2/worker"
 )
 
 func ExampleWorker() {

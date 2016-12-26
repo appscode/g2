@@ -7,19 +7,19 @@ import (
 
 var (
 	inpackcases = map[uint32]map[string]string{
-		dtNoop: map[string]string{
+		dtNoop: {
 			"src": "\x00RES\x00\x00\x00\x06\x00\x00\x00\x00",
 		},
-		dtNoJob: map[string]string{
+		dtNoJob: {
 			"src": "\x00RES\x00\x00\x00\x0a\x00\x00\x00\x00",
 		},
-		dtJobAssign: map[string]string{
+		dtJobAssign: {
 			"src":    "\x00RES\x00\x00\x00\x0b\x00\x00\x00\x07a\x00b\x00xyz",
 			"handle": "a",
 			"fn":     "b",
 			"data":   "xyz",
 		},
-		dtJobAssignUniq: map[string]string{
+		dtJobAssignUniq: {
 			"src":    "\x00RES\x00\x00\x00\x1F\x00\x00\x00\x09a\x00b\x00c\x00xyz",
 			"handle": "a",
 			"fn":     "b",
