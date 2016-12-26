@@ -16,7 +16,7 @@ in an easy way.
 
 	import "github.com/appscode/g2/worker"
 */
-package gearman
+package g2
 
 import (
 	_ "github.com/appscode/g2/client"
