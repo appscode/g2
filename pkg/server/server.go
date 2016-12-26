@@ -10,7 +10,7 @@ import (
 
 	. "github.com/appscode/g2/pkg/runtime"
 	"github.com/appscode/g2/pkg/storage"
-	log "github.com/ngaut/logging"
+	"github.com/appscode/log"
 	"github.com/ngaut/stats"
 )
 

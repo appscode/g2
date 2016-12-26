@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/appscode/log"
 	"github.com/go-macaron/toolbox"
 	"github.com/go-martini/martini"
-	log "github.com/ngaut/logging"
 	"github.com/ngaut/stats"
 	"gopkg.in/macaron.v1"
 )

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	. "github.com/appscode/g2/pkg/runtime"
-	log "github.com/ngaut/logging"
+	"github.com/appscode/log"
 )
 
 type session struct {
