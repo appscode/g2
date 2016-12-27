@@ -1,5 +1,5 @@
 hash: b2db837419def5ea723830c034919757a801b60ae8f0a232c850920c0ee724e5
-updated: 2016-12-25T22:37:44.198021908-08:00
+updated: 2016-12-26T17:09:07.456030381-08:00
 imports:
 - name: github.com/appscode/go
   version: 7995bcb0419b6ed977ca66d4482c3a625847270e
@@ -10,14 +10,10 @@ imports:
   version: 3f1acdeb89863d101e1d5fc0fefb478b1e990b28
   subpackages:
   - golog
-- name: github.com/codegangsta/inject
-  version: 33e0aa1cb7c019ccc3fbe049a8262a6403d30504
 - name: github.com/go-macaron/inject
   version: d8a0b8677191f4380287cfebd08e462217bac7ad
 - name: github.com/go-macaron/toolbox
   version: 99a42f20e9e88daec5c0d7beb4e7eac134680ab0
-- name: github.com/go-martini/martini
-  version: fe605b5cd210047ae3bb73d2b69a5b912a9b423d
 - name: github.com/golang/glog
   version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/snappy
@@ -33,9 +29,9 @@ imports:
 - name: github.com/ngaut/stats
   version: 8564f986a400931e52c2261e4b784d812c854537
 - name: github.com/spf13/cobra
-  version: 9c28e4bbd74e5c3ed7aacbc552b2cab7cfdfe744
+  version: f62e98d28ab7ad31d707ba837a966378465c7b57
 - name: github.com/spf13/pflag
-  version: c7e63cf4530bcd3ba943729cee0efeff2ebea63f
+  version: 5ccb023bc27df288a957c5e994cd44fd19619465
 - name: github.com/syndtr/goleveldb
   version: 6b4daa5362b502898ddf367c5c11deb9e7a5c727
   subpackages:
