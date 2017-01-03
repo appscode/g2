@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"os"
 
+	"time"
+
 	"github.com/appscode/log"
 	"github.com/go-macaron/toolbox"
 	"github.com/ngaut/stats"
@@ -62,5 +64,12 @@ func registerWebHandler(s *Server) {
 		return getWorker(s, ctx)
 	})
 
-	log.Fatal(http.ListenAndServe(addr, m))
+	log.Infof("listening on %s (%s)\n", addr, macaron.Env)
+	srv := &http.Server{
+		Addr:         addr,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		Handler:      m,
+	}
+	log.Fatalln(srv.ListenAndServe())
 }
