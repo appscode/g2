@@ -11,7 +11,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
 	"time"
 
 	"github.com/appscode/g2/pkg/runtime"
