@@ -1,0 +1,14 @@
+image: clever/drone-go:1.7
+notify:
+  email:
+    recipients:
+    - drone@clever.com
+  slack:
+    on_failure: true
+    on_started: false
+    on_success: false
+    webhook_url: $$slack_webhook
+script:
+- make test
+publish:
+  report_card: {}
