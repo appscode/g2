@@ -75,6 +75,7 @@ def version():
 
 
 def fmt():
+    libbuild.ungroup_go_imports('client' 'cmd' 'example' 'gearadmin' 'pkg' 'worker')
     die(call('goimports -w client cmd example pkg worker'))
     call('gofmt -s -w client cmd example pkg worker')
 
