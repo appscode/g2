@@ -136,6 +136,7 @@ Acknowledgement
 ===============
  * Client and Worker package forked from https://github.com/mikespook/gearman-go
  * Server package forked from https://github.com/ngaut/gearmand
+ * Gearadmin client forked from https://github.com/Clever/gearadmin
  * Gearman project (http://gearman.org/protocol/)
 
 Open Source - MIT Software License
