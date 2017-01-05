@@ -9,7 +9,7 @@
 //
 //         import (
 //         	"fmt"
-//         	"github.com/Clever/gearadmin"
+//         	"github.com/appscode/g2/gearadmin"
 //         	"net"
 //         )
 //
