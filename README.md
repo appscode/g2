@@ -110,6 +110,30 @@ handle, err := c.Do("ToUpper", echo, client.JobNormal, jobHandler)
 // ...
 ```
 
+## Gearman Admin Client
+Package gearadmin provides simple bindings to the gearman admin protocol: http://gearman.org/protocol/. Here's an example program that outputs the status of all worker queues in gearman:
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/appscode/g2/gearadmin"
+	"net"
+)
+
+func main() {
+	c, err := net.Dial("tcp", "localhost:4730")
+	if err != nil {
+		panic(err)
+	}
+	defer c.Close()
+	admin := gearadmin.NewGearmanAdmin(c)
+	status, _ := admin.Status()
+	fmt.Printf("%#v\n", status)
+}
+```
+
 Build Instructions
 ==================
 ```sh
