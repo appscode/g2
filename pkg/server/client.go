@@ -14,8 +14,8 @@ type Client struct {
 	Session
 }
 
-func (self *Session) Send(data []byte) bool {
-	self.in <- data
+func (s *Session) Send(data []byte) bool {
+	s.in <- data
 	return true
 }
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	rt "github.com/appscode/g2/pkg/runtime"
+	"github.com/appscode/log"
 )
 
 const (
@@ -11,6 +12,16 @@ const (
 )
 
 var client *Client
+
+func init() {
+	if client == nil {
+		var err error
+		client, err = New(rt.Network, "127.0.0.1:4730")
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+}
 
 func TestClientAddServer(t *testing.T) {
 	t.Log("Add local server 127.0.0.1:4730")
@@ -36,10 +47,34 @@ func TestClientEcho(t *testing.T) {
 }
 
 func TestClientDoBg(t *testing.T) {
-	handle, err := client.DoBg("ToUpper", []byte("abcdef"), runtime.JobLow)
+	handle, err := client.DoBg("ToUpper", []byte("abcdef"), rt.JobNormal)
 	if err != nil {
 		t.Error(err)
 		return
+	}
+	if handle == "" {
+		t.Error("Handle is empty.")
+	} else {
+		t.Log(handle)
+	}
+}
+
+func TestClientDoCron(t *testing.T) {
+	handle, err := client.DoCron("scheduledJobTest", "* * * * *", []byte("test data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if handle == "" {
+		t.Error("Handle is empty.")
+	} else {
+		t.Log(handle)
+	}
+}
+
+func TestClientDoAt(t *testing.T) {
+	handle, err := client.DoAt("scheduledJobTest", 1484160580, []byte("test data"))
+	if err != nil {
+		t.Fatal(err)
 	}
 	if handle == "" {
 		t.Error("Handle is empty.")
@@ -59,7 +94,7 @@ func TestClientDo(t *testing.T) {
 		return
 	}
 	handle, err := client.Do("ToUpper", []byte("abcdef"),
-		runtime.JobLow, jobHandler)
+		rt.JobLow, jobHandler)
 	if err != nil {
 		t.Error(err)
 		return
@@ -86,7 +121,7 @@ func TestClientStatus(t *testing.T) {
 		return
 	}
 
-	handle, err := client.Do("Delay5sec", []byte("abcdef"), runtime.JobLow, nil)
+	handle, err := client.Do("Delay5sec", []byte("abcdef"), rt.JobLow, nil)
 	if err != nil {
 		t.Error(err)
 		return

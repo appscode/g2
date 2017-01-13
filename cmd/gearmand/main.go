@@ -33,7 +33,7 @@ func main() {
 	gearmand.RegisterCoreDump(coredumpDir)
 
 	// runtime.GOMAXPROCS(1)
-	var store storage.JobQueue
+	var store storage.Db
 	if s, err := leveldbq.New(storageDir); err == nil {
 		store = s
 	} else {

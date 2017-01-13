@@ -3,29 +3,34 @@ package server
 import (
 	"container/list"
 	"encoding/json"
+	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/appscode/errors"
 	. "github.com/appscode/g2/pkg/runtime"
 	"github.com/appscode/g2/pkg/storage"
 	"github.com/appscode/log"
 	"github.com/ngaut/stats"
+	lberror "github.com/syndtr/goleveldb/leveldb/errors"
+	"gopkg.in/robfig/cron.v2"
 )
 
 type Server struct {
-	protoEvtCh chan *event
-	ctrlEvtCh  chan *event
-	funcWorker map[string]*jobworkermap //function worker
-	worker     map[int64]*Worker
-	client     map[int64]*Client
-	jobs       map[string]*Job
-
+	protoEvtCh     chan *event
+	ctrlEvtCh      chan *event
+	funcWorker     map[string]*jobworkermap //function worker
+	worker         map[int64]*Worker
+	client         map[int64]*Client
+	jobs           map[string]*Job
 	startSessionId int64
 	opCounter      map[PT]int64
-	store          storage.JobQueue
+	store          storage.Db
 	forwardReport  int64
+	cronSvc        *cron.Cron
 }
 
 var ( //const replys, to avoid building it every time
@@ -33,7 +38,7 @@ var ( //const replys, to avoid building it every time
 	nojobReply  = constructReply(PT_NoJob, nil)
 )
 
-func NewServer(store storage.JobQueue) *Server {
+func NewServer(store storage.Db) *Server {
 	return &Server{
 		funcWorker: make(map[string]*jobworkermap),
 		protoEvtCh: make(chan *event, 100),
@@ -43,40 +48,55 @@ func NewServer(store storage.JobQueue) *Server {
 		jobs:       make(map[string]*Job),
 		opCounter:  make(map[PT]int64),
 		store:      store,
+		cronSvc:    cron.New(),
 	}
 }
 
-func (self *Server) getAllJobs() {
-	jobs, err := self.store.GetJobs()
+func (s *Server) loadAllJobs() {
+	jobs, err := s.store.GetJobs()
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
 	log.Debugf("%+v", jobs)
-
 	for _, j := range jobs {
 		j.ProcessBy = 0 //no body handle it now
 		j.CreateBy = 0  //clear
-		self.doAddJob(j)
+		s.doAddJob(j)
 	}
 }
 
-func (self *Server) Start(addr string) {
+func (s *Server) loadAllCronJobs() {
+	schedJobs, err := s.store.GetCronJobs()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	log.Debugf("load scheduled job: %+v", schedJobs)
+	for _, sj := range schedJobs {
+		s.doAddCronJob(sj)
+	}
+}
+
+func (s *Server) Start(addr string) {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	go self.EvtLoop()
-
+	go s.EvtLoop()
 	log.Debug("listening on", addr)
 
-	go registerWebHandler(self)
+	go registerWebHandler(s)
 
+	if s.cronSvc != nil {
+		s.cronSvc.Start()
+	}
 	//load background jobs from storage
-	if self.store != nil {
-		self.getAllJobs()
+	if s.store != nil {
+		s.loadAllJobs()
+		s.loadAllCronJobs()
 	}
 
 	for {
@@ -86,11 +106,11 @@ func (self *Server) Start(addr string) {
 		}
 
 		session := &session{}
-		go session.handleConnection(self, conn)
+		go session.handleConnection(s, conn)
 	}
 }
 
-func (self *Server) addWorker(l *list.List, w *Worker) {
+func (s *Server) addWorker(l *list.List, w *Worker) {
 	for it := l.Front(); it != nil; it = it.Next() {
 		if it.Value.(*Worker).SessionId == w.SessionId {
 			log.Warning("already add")
@@ -101,7 +121,7 @@ func (self *Server) addWorker(l *list.List, w *Worker) {
 	l.PushBack(w) //add to worker list
 }
 
-func (self *Server) removeWorker(l *list.List, sessionId int64) {
+func (s *Server) removeWorker(l *list.List, sessionId int64) {
 	for it := l.Front(); it != nil; it = it.Next() {
 		if it.Value.(*Worker).SessionId == sessionId {
 			log.Debugf("removeWorker sessionId %d", sessionId)
@@ -111,49 +131,120 @@ func (self *Server) removeWorker(l *list.List, sessionId int64) {
 	}
 }
 
-func (self *Server) removeWorkerBySessionId(sessionId int64) {
-	for _, jw := range self.funcWorker {
-		self.removeWorker(jw.workers, sessionId)
+func (s *Server) removeWorkerBySessionId(sessionId int64) {
+	for _, jw := range s.funcWorker {
+		s.removeWorker(jw.workers, sessionId)
 	}
-	delete(self.worker, sessionId)
+	delete(s.worker, sessionId)
 }
 
-func (self *Server) handleCanDo(funcName string, w *Worker) {
+func (s *Server) handleCanDo(funcName string, w *Worker) {
 	w.canDo[funcName] = true
-	jw := self.getJobWorkPair(funcName)
-	self.addWorker(jw.workers, w)
-	self.worker[w.SessionId] = w
+	jw := s.getJobWorkPair(funcName)
+	s.addWorker(jw.workers, w)
+	s.worker[w.SessionId] = w
 }
 
-func (self *Server) getJobWorkPair(funcName string) *jobworkermap {
-	jw, ok := self.funcWorker[funcName]
+func (s *Server) getJobWorkPair(funcName string) *jobworkermap {
+	jw, ok := s.funcWorker[funcName]
 	if !ok { //create list
 		jw = &jobworkermap{workers: list.New(), jobs: list.New()}
-		self.funcWorker[funcName] = jw
+		s.funcWorker[funcName] = jw
 	}
 
 	return jw
 }
 
-func (self *Server) add2JobWorkerQueue(j *Job) {
-	jw := self.getJobWorkPair(j.FuncName)
+func (s *Server) add2JobWorkerQueue(j *Job) {
+	jw := s.getJobWorkPair(j.FuncName)
 	jw.jobs.PushBack(j)
 }
 
-func (self *Server) doAddJob(j *Job) {
+func (s *Server) doAddJob(j *Job) {
 	j.ProcessBy = 0 //nobody handle it right now
-	self.add2JobWorkerQueue(j)
-	self.jobs[j.Handle] = j
-	self.wakeupWorker(j.FuncName)
+	s.add2JobWorkerQueue(j)
+	s.jobs[j.Handle] = j
+	s.wakeupWorker(j.FuncName)
 }
 
-func (self *Server) popJob(sessionId int64) (j *Job) {
-	for funcName, cando := range self.worker[sessionId].canDo {
+func (s *Server) doAddAndPersistJob(j *Job) {
+	// persistent job
+	log.Debugf("add job %+v", j)
+	if s.store != nil {
+		if err := s.store.AddJob(j); err != nil {
+			log.Warning(err)
+		}
+	}
+	s.doAddJob(j)
+}
+
+func (s *Server) doAddCronJob(sj *CronJob) cron.EntryID {
+
+	if strings.HasPrefix(sj.ScheduleTime, EpochTimePrefix) {
+		value, err := strconv.ParseInt(sj.ScheduleTime[len(EpochTimePrefix):], 10, 64)
+		if err != nil {
+			log.Errorln(err)
+		}
+		s.doAddEpochJob(sj, value)
+	} else {
+		scdT, err := NewCronSchedule(sj.ScheduleTime)
+		if err != nil {
+			log.Errorln(err)
+			return cron.EntryID(0)
+		}
+		return s.cronSvc.Schedule(
+			scdT.Schedule(),
+			cron.FuncJob(
+				func() {
+					jb := &Job{
+						Handle:       allocJobId(),
+						Id:           sj.JobTemplete.Id,
+						Data:         sj.JobTemplete.Data,
+						CreateAt:     time.Now(),
+						CreateBy:     sj.JobTemplete.CreateBy,
+						FuncName:     sj.JobTemplete.FuncName,
+						Priority:     sj.JobTemplete.Priority,
+						IsBackGround: sj.JobTemplete.IsBackGround,
+						CronHandle:   sj.Handle,
+					}
+					s.doAddAndPersistJob(jb)
+				}))
+	}
+	return cron.EntryID(0)
+}
+
+func (s *Server) doAddEpochJob(cj *CronJob, epoch int64) {
+	j := &Job{
+		Handle:       allocJobId(),
+		Id:           cj.JobTemplete.Id,
+		Data:         cj.JobTemplete.Data,
+		CreateAt:     time.Now(),
+		CreateBy:     cj.JobTemplete.CreateBy,
+		FuncName:     cj.JobTemplete.FuncName,
+		Priority:     cj.JobTemplete.Priority,
+		IsBackGround: cj.JobTemplete.IsBackGround,
+	}
+	after := epoch - time.Now().UTC().Unix()
+	if after < 0 {
+		after = 0
+	}
+	time.AfterFunc(time.Second*time.Duration(after), func() {
+		s.doAddAndPersistJob(j)
+		err := s.DeleteCronJob(cj)
+		if err != nil {
+			log.Errorln(err)
+		}
+	})
+
+}
+
+func (s *Server) popJob(sessionId int64) (j *Job) {
+	for funcName, cando := range s.worker[sessionId].canDo {
 		if !cando {
 			continue
 		}
 
-		if wj, ok := self.funcWorker[funcName]; ok {
+		if wj, ok := s.funcWorker[funcName]; ok {
 			if wj.jobs.Len() == 0 {
 				continue
 			}
@@ -168,8 +259,8 @@ func (self *Server) popJob(sessionId int64) (j *Job) {
 	return
 }
 
-func (self *Server) wakeupWorker(funcName string) bool {
-	wj, ok := self.funcWorker[funcName]
+func (s *Server) wakeupWorker(funcName string) bool {
+	wj, ok := s.funcWorker[funcName]
 	if !ok || wj.jobs.Len() == 0 || wj.workers.Len() == 0 {
 		return false
 	}
@@ -189,52 +280,55 @@ func (self *Server) wakeupWorker(funcName string) bool {
 	return false
 }
 
-func (self *Server) checkAndRemoveJob(tp PT, j *Job) {
+func (s *Server) checkAndRemoveJob(tp PT, j *Job) {
 	switch tp {
-	case PT_WorkComplete, PT_WorkException, PT_WorkFail:
-		self.removeJob(j)
+	case PT_WorkComplete:
+		s.removeJob(j, true)
+	case PT_WorkException, PT_WorkFail:
+		s.removeJob(j, false)
 	}
 }
 
-func (self *Server) removeJob(j *Job) {
-	delete(self.jobs, j.Handle)
-	delete(self.worker[j.ProcessBy].runningJobs, j.Handle)
+func (s *Server) removeJob(j *Job, isSuccess bool) {
+	delete(s.jobs, j.Handle)
+	delete(s.worker[j.ProcessBy].runningJobs, j.Handle)
 	if j.IsBackGround {
 		log.Debugf("done job: %v", j.Handle)
-		if self.store != nil {
-			if err := self.store.DoneJob(j); err != nil {
+		if s.store != nil {
+			if err := s.store.DeleteJob(j, isSuccess); err != nil {
 				log.Warning(err)
 			}
 		}
 	}
 }
 
-func (self *Server) handleCloseSession(e *event) error {
+func (s *Server) handleCloseSession(e *event) error {
 	sessionId := e.fromSessionId
-	if w, ok := self.worker[sessionId]; ok {
+	if w, ok := s.worker[sessionId]; ok {
 		if sessionId != w.SessionId {
 			log.Fatalf("sessionId not match %d-%d, bug found", sessionId, w.SessionId)
 		}
-		self.removeWorkerBySessionId(w.SessionId)
+		s.removeWorkerBySessionId(w.SessionId)
 
 		//reschedule these jobs, so other workers can handle it
 		for handle, j := range w.runningJobs {
 			if handle != j.Handle {
 				log.Fatal("handle not match %d-%d", handle, j.Handle)
 			}
-			self.doAddJob(j)
+			j.Running = false
+			s.doAddJob(j)
 		}
 	}
-	if c, ok := self.client[sessionId]; ok {
+	if c, ok := s.client[sessionId]; ok {
 		log.Debug("removeClient sessionId", sessionId)
-		delete(self.client, c.SessionId)
+		delete(s.client, c.SessionId)
 	}
 	e.result <- true //notify close finish
 
 	return nil
 }
 
-func (self *Server) handleGetWorker(e *event) (err error) {
+func (s *Server) handleGetWorker(e *event) (err error) {
 	var buf []byte
 	defer func() {
 		e.result <- string(buf)
@@ -242,8 +336,8 @@ func (self *Server) handleGetWorker(e *event) (err error) {
 	cando := e.args.t0.(string)
 	log.Debug("get worker", cando)
 	if len(cando) == 0 {
-		workers := make([]*Worker, 0, len(self.worker))
-		for _, v := range self.worker {
+		workers := make([]*Worker, 0, len(s.worker))
+		for _, v := range s.worker {
 			workers = append(workers, v)
 		}
 		buf, err = json.Marshal(workers)
@@ -254,9 +348,8 @@ func (self *Server) handleGetWorker(e *event) (err error) {
 		return nil
 	}
 
-	log.Debugf("%+v", self.funcWorker)
-
-	if jw, ok := self.funcWorker[cando]; ok {
+	log.Debugf("%+v", s.funcWorker)
+	if jw, ok := s.funcWorker[cando]; ok {
 		log.Debug(cando, jw.workers.Len())
 		workers := make([]*Worker, 0, jw.workers.Len())
 		for it := jw.workers.Front(); it != nil; it = it.Next() {
@@ -273,15 +366,19 @@ func (self *Server) handleGetWorker(e *event) (err error) {
 	return
 }
 
-func (self *Server) handleGetJob(e *event) (err error) {
-	log.Debug("get worker", e.jobHandle)
+func (s *Server) handleGetJob(e *event) (err error) {
+	log.Debug("get jobs", e.handle)
 	var buf []byte
 	defer func() {
 		e.result <- string(buf)
 	}()
 
-	if len(e.jobHandle) == 0 {
-		buf, err = json.Marshal(self.jobs)
+	if len(e.handle) == 0 {
+		jobs := []*Job{}
+		for _, v := range s.jobs {
+			jobs = append(jobs, v)
+		}
+		buf, err = json.Marshal(jobs)
 		if err != nil {
 			log.Error(err)
 			return err
@@ -289,23 +386,63 @@ func (self *Server) handleGetJob(e *event) (err error) {
 		return nil
 	}
 
-	if job, ok := self.jobs[e.jobHandle]; ok {
-		buf = []byte(job.String())
+	if job, ok := s.jobs[e.handle]; ok {
+		buf, err = json.Marshal(job)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
 		return nil
 	}
 
 	return
 }
 
-func (self *Server) handleCtrlEvt(e *event) (err error) {
+func (s *Server) handleGetCronJob(e *event) (err error) {
+	log.Debug("get cronjobs", e.handle)
+	var buf []byte
+	defer func() {
+		e.result <- string(buf)
+	}()
+
+	if len(e.handle) == 0 {
+		cjs, err := s.store.GetCronJobs()
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		buf, err = json.Marshal(cjs)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		return nil
+	}
+	cj, err := s.store.GetCronJob(e.handle)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	data, err := json.Marshal(cj)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	buf = []byte(data)
+	return
+}
+
+func (s *Server) handleCtrlEvt(e *event) (err error) {
 	//args := e.args
 	switch e.tp {
 	case ctrlCloseSession:
-		return self.handleCloseSession(e)
+		return s.handleCloseSession(e)
 	case ctrlGetJob:
-		return self.handleGetJob(e)
+		return s.handleGetJob(e)
 	case ctrlGetWorker:
-		return self.handleGetWorker(e)
+		return s.handleGetWorker(e)
+	case ctrlGetCronJob:
+		return s.handleGetCronJob(e)
 	default:
 		log.Warningf("%s, %d", e.tp, e.tp)
 	}
@@ -313,42 +450,118 @@ func (self *Server) handleCtrlEvt(e *event) (err error) {
 	return nil
 }
 
-func (self *Server) handleSubmitJob(e *event) {
+func (s *Server) handleSubmitJob(e *event) {
 	args := e.args
 	c := args.t0.(*Client)
-	self.client[c.SessionId] = c
+	s.client[c.SessionId] = c
 	funcName := bytes2str(args.t1)
-	j := &Job{Id: bytes2str(args.t2), Data: args.t3.([]byte),
-		Handle: allocJobId(), CreateAt: time.Now(), CreateBy: c.SessionId,
-		FuncName: funcName, Priority: PRIORITY_LOW}
-
-	j.IsBackGround = isBackGround(e.tp)
-	// persistent job
-	log.Debugf("add job %+v", j)
-	if self.store != nil {
-		if err := self.store.AddJob(j); err != nil {
-			log.Warning(err)
-		}
+	j := &Job{
+		Handle:       allocJobId(),
+		Id:           bytes2str(args.t2),
+		Data:         args.t3.([]byte),
+		CreateAt:     time.Now(),
+		CreateBy:     c.SessionId,
+		FuncName:     funcName,
+		Priority:     cmd2Priority(e.tp),
+		IsBackGround: isBackGround(e.tp),
 	}
-
-	j.Priority = cmd2Priority(e.tp)
-
 	//log.Debugf("%v, job handle %v, %s", CmdDescription(e.tp), j.Handle, string(j.Data))
 	e.result <- j.Handle
-	self.doAddJob(j)
+	s.doAddAndPersistJob(j)
 }
 
-func (self *Server) handleWorkReport(e *event) {
+func (s *Server) handleCronJob(e *event) {
+	args := e.args
+	c := args.t0.(*Client)
+	s.client[c.SessionId] = c
+	funcName := bytes2str(args.t1)
+	sst, err := NewCronSchedule(fmt.Sprintf("%v %v %v %v %v",
+		byte2strWithFixSpace(args.t3),
+		byte2strWithFixSpace(args.t4),
+		byte2strWithFixSpace(args.t5),
+		byte2strWithFixSpace(args.t6),
+		byte2strWithFixSpace(args.t7)),
+	)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	sj := &CronJob{
+		JobTemplete: Job{
+			Id:           bytes2str(args.t2),
+			Data:         args.t8.([]byte),
+			CreateAt:     time.Now(),
+			CreateBy:     c.SessionId,
+			FuncName:     funcName,
+			Priority:     cmd2Priority(e.tp),
+			IsBackGround: true,
+		},
+		ScheduleTime: sst.Expr(),
+	}
+	sj.Handle = allocSchedJobId()
+	e.result <- sj.Handle
+	// persistent Cron Job
+	log.Debugf("add scheduled job %+v", sj)
+	id := s.doAddCronJob(sj)
+	if err != nil {
+		log.Errorln(err)
+	}
+	sj.CronEntryID = int(id)
+	if s.store != nil {
+		if err := s.store.AddCronJob(sj); err != nil {
+			log.Errorln(err)
+		}
+	}
+	log.Debugf("Scheduled cron job added with function name `%s`, data '%s' and cron SpecScheduleTime - '%+v'\n", string(sj.JobTemplete.FuncName), string(sj.JobTemplete.Data), sj.ScheduleTime)
+}
+
+func (s *Server) handleSubmitEpochJob(e *event) {
+	args := e.args
+	c := args.t0.(*Client)
+	s.client[c.SessionId] = c
+	funcName := bytes2str(args.t1)
+	epochStr := bytes2str(args.t3)
+	val, err := strconv.ParseInt(epochStr, 10, 64)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	sj := &CronJob{
+		JobTemplete: Job{
+			Id:           bytes2str(args.t2),
+			Data:         args.t4.([]byte),
+			CreateAt:     time.Now(),
+			CreateBy:     c.SessionId,
+			FuncName:     funcName,
+			Priority:     cmd2Priority(e.tp),
+			IsBackGround: true,
+		},
+		ScheduleTime: EpochTimePrefix + epochStr,
+	}
+	sj.Handle = allocSchedJobId()
+	e.result <- sj.Handle
+
+	// persistent Cron Job
+	log.Debugf("add scheduled epoch job %+v", sj)
+	s.doAddEpochJob(sj, val)
+	if s.store != nil {
+		if err := s.store.AddCronJob(sj); err != nil {
+			log.Errorln(err)
+		}
+	}
+}
+
+func (s *Server) handleWorkReport(e *event) {
 	args := e.args
 	slice := args.t0.([][]byte)
 	jobhandle := bytes2str(slice[0])
 	sessionId := e.fromSessionId
-	j, ok := self.worker[sessionId].runningJobs[jobhandle]
+	j, ok := s.worker[sessionId].runningJobs[jobhandle]
 
 	log.Debugf("%v job handle %v", e.tp, jobhandle)
 	if !ok {
 		log.Warningf("job information lost, %v job handle %v, %+v",
-			e.tp, jobhandle, self.jobs)
+			e.tp, jobhandle, s.jobs)
 		return
 	}
 
@@ -361,7 +574,7 @@ func (self *Server) handleWorkReport(e *event) {
 		j.Denominator, _ = strconv.Atoi(string(slice[2]))
 	}
 
-	self.checkAndRemoveJob(e.tp, j)
+	s.checkAndRemoveJob(e.tp, j)
 
 	//the client is not updated with status or notified when the job has completed (it is detached)
 	if j.IsBackGround {
@@ -377,7 +590,7 @@ func (self *Server) handleWorkReport(e *event) {
 	//just send to original client, which is a bad idea too.
 	//if need work status notification, you should create co-worker.
 	//let worker send status to this co-worker
-	c, ok := self.client[j.CreateBy]
+	c, ok := s.client[j.CreateBy]
 	if !ok {
 		log.Debug(j.Handle, "sessionId", j.CreateBy, "missing")
 		return
@@ -385,42 +598,41 @@ func (self *Server) handleWorkReport(e *event) {
 
 	reply := constructReply(e.tp, slice)
 	c.Send(reply)
-	self.forwardReport++
+	s.forwardReport++
 }
 
-func (self *Server) handleProtoEvt(e *event) {
+func (s *Server) handleProtoEvt(e *event) {
 	args := e.args
 	if e.tp < ctrlCloseSession {
-		self.opCounter[e.tp]++
+		s.opCounter[e.tp]++
 	}
 
 	if e.tp >= ctrlCloseSession {
-		self.handleCtrlEvt(e)
+		s.handleCtrlEvt(e)
 		return
 	}
-
 	switch e.tp {
 	case PT_CanDo:
 		w := args.t0.(*Worker)
 		funcName := args.t1.(string)
-		self.handleCanDo(funcName, w)
+		s.handleCanDo(funcName, w)
 	case PT_CantDo:
 		sessionId := e.fromSessionId
 		funcName := args.t0.(string)
-		if jw, ok := self.funcWorker[funcName]; ok {
-			self.removeWorker(jw.workers, sessionId)
+		if jw, ok := s.funcWorker[funcName]; ok {
+			s.removeWorker(jw.workers, sessionId)
 		}
-		delete(self.worker[sessionId].canDo, funcName)
+		delete(s.worker[sessionId].canDo, funcName)
 	case PT_SetClientId:
 		w := args.t0.(*Worker)
 		w.workerId = args.t1.(string)
 	case PT_CanDoTimeout: //todo: fix timeout support, now just as CAN_DO
 		w := args.t0.(*Worker)
 		funcName := args.t1.(string)
-		self.handleCanDo(funcName, w)
+		s.handleCanDo(funcName, w)
 	case PT_GrabJobUniq:
 		sessionId := e.fromSessionId
-		w, ok := self.worker[sessionId]
+		w, ok := s.worker[sessionId]
 		if !ok {
 			log.Fatalf("unregister worker, sessionId %d", sessionId)
 			break
@@ -428,11 +640,12 @@ func (self *Server) handleProtoEvt(e *event) {
 
 		w.status = wsRunning
 
-		j := self.popJob(sessionId)
+		j := s.popJob(sessionId)
 		if j != nil {
 			j.ProcessAt = time.Now()
 			j.ProcessBy = sessionId
 			//track this job
+			j.Running = true
 			w.runningJobs[j.Handle] = j
 		} else { //no job
 			w.status = wsPrepareForSleep
@@ -441,11 +654,11 @@ func (self *Server) handleProtoEvt(e *event) {
 		e.result <- j
 	case PT_PreSleep:
 		sessionId := e.fromSessionId
-		w, ok := self.worker[sessionId]
+		w, ok := s.worker[sessionId]
 		if !ok {
 			log.Warningf("unregister worker, sessionId %d", sessionId)
 			w = args.t0.(*Worker)
-			self.worker[w.SessionId] = w
+			s.worker[w.SessionId] = w
 			break
 		}
 
@@ -453,15 +666,19 @@ func (self *Server) handleProtoEvt(e *event) {
 		log.Debugf("worker sessionId %d sleep", sessionId)
 		//check if there are any jobs for this worker
 		for k := range w.canDo {
-			if self.wakeupWorker(k) {
+			if s.wakeupWorker(k) {
 				break
 			}
 		}
-	case PT_SubmitJob, PT_SubmitJobLowBG, PT_SubmitJobLow:
-		self.handleSubmitJob(e)
+	case PT_SubmitJobLow, PT_SubmitJob, PT_SubmitJobHigh, PT_SubmitJobLowBG, PT_SubmitJobBG, PT_SubmitJobHighBG:
+		s.handleSubmitJob(e)
+	case PT_SubmitJobSched:
+		s.handleCronJob(e)
+	case PT_SubmitJobEpoch:
+		s.handleSubmitEpochJob(e)
 	case PT_GetStatus:
 		jobhandle := bytes2str(args.t0)
-		if job, ok := self.jobs[jobhandle]; ok {
+		if job, ok := s.jobs[jobhandle]; ok {
 			e.result <- &Tuple{t0: args.t0, t1: true, t2: job.Running,
 				t3: job.Percent, t4: job.Denominator}
 			break
@@ -471,46 +688,61 @@ func (self *Server) handleProtoEvt(e *event) {
 			t3: 0, t4: 100} //always set Denominator to 100 if no status update
 	case PT_WorkData, PT_WorkWarning, PT_WorkStatus, PT_WorkComplete,
 		PT_WorkFail, PT_WorkException:
-		self.handleWorkReport(e)
+		s.handleWorkReport(e)
 	default:
 		log.Warningf("%s, %d", e.tp, e.tp)
 	}
 }
 
-func (self *Server) wakeupTravel() {
-	for k, jw := range self.funcWorker {
+func (s *Server) wakeupTravel() {
+	for k, jw := range s.funcWorker {
 		if jw.jobs.Len() > 0 {
-			self.wakeupWorker(k)
+			s.wakeupWorker(k)
 		}
 	}
 }
 
-func (self *Server) pubCounter() {
-	for k, v := range self.opCounter {
+func (s *Server) pubCounter() {
+	for k, v := range s.opCounter {
 		stats.PubInt64(k.String(), v)
 	}
 }
 
-func (self *Server) EvtLoop() {
+func (s *Server) EvtLoop() {
 	tick := time.NewTicker(1 * time.Second)
 	for {
 		select {
-		case e := <-self.protoEvtCh:
-			self.handleProtoEvt(e)
-		case e := <-self.ctrlEvtCh:
-			self.handleCtrlEvt(e)
+		case e := <-s.protoEvtCh:
+			s.handleProtoEvt(e)
+		case e := <-s.ctrlEvtCh:
+			s.handleCtrlEvt(e)
 		case <-tick.C:
-			self.pubCounter()
-			stats.PubInt("len(protoEvtCh)", len(self.protoEvtCh))
-			stats.PubInt("worker count", len(self.worker))
-			stats.PubInt("job queue length", len(self.jobs))
-			stats.PubInt("queue count", len(self.funcWorker))
-			stats.PubInt("client count", len(self.client))
-			stats.PubInt64("forwardReport", self.forwardReport)
+			s.pubCounter()
+			stats.PubInt("len(protoEvtCh)", len(s.protoEvtCh))
+			stats.PubInt("worker count", len(s.worker))
+			stats.PubInt("job queue length", len(s.jobs))
+			stats.PubInt("queue count", len(s.funcWorker))
+			stats.PubInt("client count", len(s.client))
+			stats.PubInt64("forwardReport", s.forwardReport)
 		}
 	}
 }
 
-func (self *Server) allocSessionId() int64 {
-	return atomic.AddInt64(&self.startSessionId, 1)
+func (s *Server) allocSessionId() int64 {
+	return atomic.AddInt64(&s.startSessionId, 1)
+}
+
+func (s *Server) DeleteCronJob(cj *CronJob) error {
+	sj, err := s.store.DeleteCronJob(cj)
+	if err == lberror.ErrNotFound {
+		log.Errorf("handle `%v` not found\n", cj.Handle)
+		return errors.NewGoError(fmt.Sprintf("handle `%v` not found", cj.Handle))
+	}
+	if err != nil {
+		log.Errorln(err)
+		return err
+	}
+	s.cronSvc.Remove(cron.EntryID(sj.CronEntryID))
+	log.Debugf("job `%v` successfully cancelled.\n", cj.Handle)
+	return nil
 }

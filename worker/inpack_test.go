@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	inpackcases = map[uint32]map[string]string{
+	inpackcases = map[rt.PT]map[string]string{
 		rt.PT_Noop: {
 			"src": "\x00RES\x00\x00\x00\x06\x00\x00\x00\x00",
 		},

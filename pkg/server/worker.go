@@ -37,21 +37,21 @@ type Worker struct {
 	canDo       map[string]bool
 }
 
-func (self *Worker) MarshalJSON() ([]byte, error) {
+func (w *Worker) MarshalJSON() ([]byte, error) {
 	b := &bytes.Buffer{}
 	enc := json.NewEncoder(b)
 	m := make(map[string]interface{})
-	m["sessionId"] = self.SessionId
-	m["Id"] = self.workerId
-	m["status"] = status2str(self.status)
-	canDoSlice := make([]string, 0, len(self.canDo))
-	for k := range self.canDo {
+	m["sessionId"] = w.SessionId
+	m["Id"] = w.workerId
+	m["status"] = status2str(w.status)
+	canDoSlice := make([]string, 0, len(w.canDo))
+	for k := range w.canDo {
 		canDoSlice = append(canDoSlice, k)
 	}
 	m["canDo"] = canDoSlice
 
-	jobSlice := make([]string, 0, len(self.canDo))
-	for k := range self.runningJobs {
+	jobSlice := make([]string, 0, len(w.canDo))
+	for k := range w.runningJobs {
 		jobSlice = append(jobSlice, k)
 	}
 	m["runningJobs"] = jobSlice

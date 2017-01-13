@@ -23,17 +23,35 @@ var (
 	invalidArg   = errors.New("invalid argument")
 )
 
+type AP string
+
+const (
+	AP_Workers         AP = "workers"
+	AP_Status          AP = "status"
+	AP_Cancel          AP = "cancel-job"
+	AP_Show            AP = "show"
+	AP_Create          AP = "create"
+	AP_Drop            AP = "drop"
+	AP_MaxQueue        AP = "maxqueue"
+	AP_GetPid          AP = "getpid"
+	AP_Shutdown        AP = "shutdown"
+	AP_Verbose         AP = "verbose"
+	AP_Version         AP = "version"
+	AP_PRIORITY_STATUS AP = "prioritystatus"
+)
+
 const (
 	ctrlCloseSession = 1000 + iota
 	ctrlGetJob
 	ctrlGetWorker
+	ctrlGetCronJob
 )
 
 var (
-	startJid        int64 = 0
-	jobHandlePrefix string
-	respMagic       = []byte(runtime.ResStr)
-	jidCh           = make(chan string, 50)
+	startJid     int64 = 0
+	handlePrefix string
+	respMagic    = []byte(runtime.ResStr)
+	idCh         = make(chan string, 50)
 )
 
 func init() {
@@ -48,21 +66,33 @@ func init() {
 	}
 
 	//cache prefix
-	jobHandlePrefix = fmt.Sprintf("%s-%s:-%d-%d-", runtime.JobPrefix, hn, os.Getpid(), time.Now().Unix())
+	handlePrefix = fmt.Sprintf("-%s:-%d-%d-", hn, os.Getpid(), time.Now().Unix())
 	go func() {
 		for {
-			jidCh <- genJid()
+			idCh <- genJid()
 		}
 	}()
 }
 
 func genJid() string {
 	startJid++
-	return jobHandlePrefix + strconv.FormatInt(startJid, 10)
+	return handlePrefix + strconv.FormatInt(startJid, 10)
 }
 
 func allocJobId() string {
-	return <-jidCh
+	return runtime.JobPrefix + <-idCh
+}
+
+func allocSchedJobId() string {
+	return runtime.SchedJobPrefix + <-idCh
+}
+
+func IsValidJobHandle(handle string) bool {
+	return strings.HasPrefix(handle, runtime.JobPrefix)
+}
+
+func IsValidCronJobHandle(handle string) bool {
+	return strings.HasPrefix(handle, runtime.SchedJobPrefix)
 }
 
 type event struct {
@@ -70,7 +100,7 @@ type event struct {
 	args          *Tuple
 	result        chan interface{}
 	fromSessionId int64
-	jobHandle     string
+	handle        string
 }
 
 type jobworkermap struct {
@@ -79,7 +109,7 @@ type jobworkermap struct {
 }
 
 type Tuple struct {
-	t0, t1, t2, t3, t4, t5 interface{}
+	t0, t1, t2, t3, t4, t5, t6, t7, t8 interface{}
 }
 
 func decodeArgs(cmd runtime.PT, buf []byte) ([][]byte, bool) {
@@ -95,7 +125,6 @@ func decodeArgs(cmd runtime.PT, buf []byte) ([][]byte, bool) {
 		args = append(args, buf)
 		return args, true
 	}
-
 	endPos := 0
 	cnt := 0
 	for ; cnt < argc-1 && endPos < len(buf); cnt++ {
@@ -109,7 +138,6 @@ func decodeArgs(cmd runtime.PT, buf []byte) ([][]byte, bool) {
 		args = append(args, buf[startPos:endPos])
 		endPos++
 	}
-
 	args = append(args, buf[endPos:]) //option data
 	cnt++
 
@@ -125,8 +153,20 @@ func sendReply(out chan []byte, tp runtime.PT, data [][]byte) {
 	out <- constructReply(tp, data)
 }
 
+func sendTextReply(out chan []byte, resp string) {
+	out <- []byte(resp)
+}
+
 func sendReplyResult(out chan []byte, data []byte) {
 	out <- data
+}
+
+func sendTextOK(out chan []byte) {
+	out <- []byte("OK\n")
+}
+
+func sendTextError(out chan []byte, errmsg string) {
+	out <- []byte(fmt.Sprintf("Error: %s\n", errmsg))
 }
 
 func constructReply(tp runtime.PT, data [][]byte) []byte {
@@ -173,6 +213,14 @@ func bool2bytes(b interface{}) []byte {
 	return []byte{'0'}
 }
 
+func byte2strWithFixSpace(o interface{}) string {
+	str := bytes2str(o)
+	if str == "" {
+		return "*"
+	}
+	return str
+}
+
 func int2bytes(n interface{}) []byte {
 	return []byte(strconv.Itoa(n.(int)))
 }
@@ -191,6 +239,11 @@ func ReadMessage(r io.Reader) (runtime.PT, []byte, error) {
 	_, err = io.ReadFull(r, buf)
 
 	return tp, buf, err
+}
+
+func ParseTextMessage(msg string) (AP, string) {
+	dt := AP(strings.Fields(msg)[0])
+	return dt, strings.TrimSpace(msg[len(dt):])
 }
 
 func readHeader(r io.Reader) (magic uint32, tp runtime.PT, size uint32, err error) {
@@ -214,7 +267,6 @@ func readHeader(r io.Reader) (magic uint32, tp runtime.PT, size uint32, err erro
 	if err != nil {
 		return
 	}
-
 	size, err = readUint32(r)
 	return
 }
@@ -336,15 +388,13 @@ func cmd2Priority(cmd runtime.PT) int {
 	case runtime.PT_SubmitJobHigh, runtime.PT_SubmitJobHighBG:
 		return runtime.PRIORITY_HIGH
 	}
-
 	return runtime.PRIORITY_LOW
 }
 
 func isBackGround(cmd runtime.PT) bool {
 	switch cmd {
-	case runtime.PT_SubmitJobLowBG, runtime.PT_SubmitJobHighBG:
+	case runtime.PT_SubmitJobLowBG, runtime.PT_SubmitJobBG, runtime.PT_SubmitJobHighBG:
 		return true
 	}
-
 	return false
 }

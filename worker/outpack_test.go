@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	outpackcases = map[uint32]map[string]string{
+	outpackcases = map[rt.PT]map[string]string{
 		rt.PT_CanDo: {
 			"src":  "\x00REQ\x00\x00\x00\x01\x00\x00\x00\x01a",
 			"data": "a",

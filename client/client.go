@@ -4,10 +4,13 @@ package client
 
 import (
 	"bufio"
+	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/appscode/errors"
 	rt "github.com/appscode/g2/pkg/runtime"
 )
 
@@ -38,7 +41,7 @@ type responseHandlerMap struct {
 }
 
 func newResponseHandlerMap() *responseHandlerMap {
-	return &responseHandlerMap{holder: make(map[string]ResponseHandler, rt.QueueSize)}
+	return &responseHandlerMap{holder: make(map[string]ResponseHandler, int(rt.QueueSize))}
 }
 
 func (r *responseHandlerMap) remove(key string) {
@@ -274,11 +277,7 @@ func (client *Client) Do(funcname string, data []byte,
 
 // Call the function in background, no response needed.
 // flag can be set to: JobLow, JobNormal and JobHigh
-func (client *Client) DoBg(funcname string, data []byte,
-	flag byte) (handle string, err error) {
-	if client.conn == nil {
-		return "", ErrLostConn
-	}
+func (client *Client) DoBg(funcname string, data []byte, flag byte) (handle string, err error) {
 	var datatype rt.PT
 	switch flag {
 	case rt.JobLow:
@@ -289,6 +288,47 @@ func (client *Client) DoBg(funcname string, data []byte,
 		datatype = rt.PT_SubmitJobBG
 	}
 	handle, err = client.do(funcname, data, datatype)
+	return
+}
+
+func (client *Client) DoCron(funcname string, cronExpr string, funcParam []byte) (string, error) {
+	cf := strings.Fields(cronExpr)
+	expLen := len(cf)
+	switch expLen {
+	case 5:
+		return client.doCron(funcname, cronExpr, funcParam)
+	case 6:
+		if cf[5] == "*" {
+			return client.doCron(funcname, strings.Join([]string{cf[0], cf[1], cf[2], cf[3], cf[4]}, " "), funcParam)
+		} else {
+			epoch, err := ToEpoch(strings.Join([]string{cf[0], cf[1], cf[2], cf[3], cf[5]}, " "))
+			if err != nil {
+				return "", err
+			}
+			return client.DoAt(funcname, epoch, funcParam)
+		}
+	default:
+		return "", errors.NewGoError("invalid cron expression")
+
+	}
+}
+
+func (client *Client) doCron(funcname string, cronExpr string, funcParam []byte) (handle string, err error) {
+	ce, err := rt.NewCronSchedule(cronExpr)
+	if err != nil {
+		return "", err
+	}
+	dbyt := []byte(fmt.Sprintf("%v%v", string(ce.Bytes()), string(funcParam)))
+	handle, err = client.do(funcname, dbyt, rt.PT_SubmitJobSched)
+	return
+}
+
+func (client *Client) DoAt(funcname string, epoch int64, funcParam []byte) (handle string, err error) {
+	if client.conn == nil {
+		return "", ErrLostConn
+	}
+	dbyt := []byte(fmt.Sprintf("%v\x00%v", epoch, string(funcParam)))
+	handle, err = client.do(funcname, dbyt, rt.PT_SubmitJobEpoch)
 	return
 }
 
