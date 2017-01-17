@@ -181,7 +181,7 @@ func (se *session) handleAdminConnection(s *Server, conn net.Conn, r *bufio.Read
 		if err != nil {
 			sendTextReply(inbox, fmt.Sprintf("Error: %v\n", err))
 			log.Errorln(err)
-			continue
+			return
 		}
 		trimedRcv := strings.TrimSpace(string(rcv))
 		if trimedRcv == "" {
