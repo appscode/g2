@@ -18,6 +18,7 @@ type JobQueue interface {
 
 type SchedJobQueue interface {
 	AddCronJob(sj *CronJob) error
+	UpdateCronJob(string, map[string]interface{}) error
 	DeleteCronJob(sj *CronJob) (*CronJob, error)
 	GetCronJob(handle string) (*CronJob, error)
 	GetCronJobs() ([]*CronJob, error)

@@ -75,7 +75,11 @@ func (s *Server) loadAllCronJobs() {
 	}
 	log.Debugf("load scheduled job: %+v", schedJobs)
 	for _, sj := range schedJobs {
-		s.doAddCronJob(sj)
+		if epoch, ok := s.ExpressionToEpoch(sj.Expression); ok {
+			s.doAddEpochJob(sj, epoch)
+		} else {
+			s.doAddCronJob(sj)
+		}
 	}
 }
 
@@ -179,38 +183,35 @@ func (s *Server) doAddAndPersistJob(j *Job) {
 }
 
 func (s *Server) doAddCronJob(sj *CronJob) cron.EntryID {
-
-	if strings.HasPrefix(sj.ScheduleTime, EpochTimePrefix) {
-		value, err := strconv.ParseInt(sj.ScheduleTime[len(EpochTimePrefix):], 10, 64)
-		if err != nil {
-			log.Errorln(err)
-		}
-		s.doAddEpochJob(sj, value)
-	} else {
-		scdT, err := NewCronSchedule(sj.ScheduleTime)
-		if err != nil {
-			log.Errorln(err)
-			return cron.EntryID(0)
-		}
-		return s.cronSvc.Schedule(
-			scdT.Schedule(),
-			cron.FuncJob(
-				func() {
-					jb := &Job{
-						Handle:       allocJobId(),
-						Id:           sj.JobTemplete.Id,
-						Data:         sj.JobTemplete.Data,
-						CreateAt:     time.Now(),
-						CreateBy:     sj.JobTemplete.CreateBy,
-						FuncName:     sj.JobTemplete.FuncName,
-						Priority:     sj.JobTemplete.Priority,
-						IsBackGround: sj.JobTemplete.IsBackGround,
-						CronHandle:   sj.Handle,
-					}
-					s.doAddAndPersistJob(jb)
-				}))
+	scdT, err := NewCronSchedule(sj.Expression)
+	if err != nil {
+		log.Errorln(err)
+		return cron.EntryID(0)
 	}
-	return cron.EntryID(0)
+	return s.cronSvc.Schedule(
+		scdT.Schedule(),
+		cron.FuncJob(
+			func() {
+				jb := &Job{
+					Handle:       allocJobId(),
+					Id:           sj.JobTemplete.Id,
+					Data:         sj.JobTemplete.Data,
+					CreateAt:     time.Now(),
+					CreateBy:     sj.JobTemplete.CreateBy,
+					FuncName:     sj.JobTemplete.FuncName,
+					Priority:     sj.JobTemplete.Priority,
+					IsBackGround: sj.JobTemplete.IsBackGround,
+					CronHandle:   sj.Handle,
+				}
+				err := s.store.UpdateCronJob(sj.Handle, map[string]interface{}{
+					"Next": scdT.Schedule().Next(time.Now()),
+					"Prev": time.Now(),
+				})
+				if err != nil {
+					log.Error(err)
+				}
+				s.doAddAndPersistJob(jb)
+			}))
 }
 
 func (s *Server) doAddEpochJob(cj *CronJob, epoch int64) {
@@ -496,23 +497,25 @@ func (s *Server) handleCronJob(e *event) {
 			Priority:     cmd2Priority(e.tp),
 			IsBackGround: true,
 		},
-		ScheduleTime: sst.Expr(),
+		Expression: sst.Expr(),
 	}
 	sj.Handle = allocSchedJobId()
 	e.result <- sj.Handle
 	// persistent Cron Job
 	log.Debugf("add scheduled job %+v", sj)
 	id := s.doAddCronJob(sj)
+	sj.CronEntryID = int(id)
+	scdT, err := NewCronSchedule(sj.Expression)
 	if err != nil {
 		log.Errorln(err)
 	}
-	sj.CronEntryID = int(id)
+	sj.Next = scdT.Schedule().Next(time.Now())
 	if s.store != nil {
 		if err := s.store.AddCronJob(sj); err != nil {
 			log.Errorln(err)
 		}
 	}
-	log.Debugf("Scheduled cron job added with function name `%s`, data '%s' and cron SpecScheduleTime - '%+v'\n", string(sj.JobTemplete.FuncName), string(sj.JobTemplete.Data), sj.ScheduleTime)
+	log.Debugf("Scheduled cron job added with function name `%s`, data '%s' and cron SpecScheduleTime - '%+v'\n", string(sj.JobTemplete.FuncName), string(sj.JobTemplete.Data), sj.Expression)
 }
 
 func (s *Server) handleSubmitEpochJob(e *event) {
@@ -536,11 +539,12 @@ func (s *Server) handleSubmitEpochJob(e *event) {
 			Priority:     cmd2Priority(e.tp),
 			IsBackGround: true,
 		},
-		ScheduleTime: EpochTimePrefix + epochStr,
+		Expression: EpochTimePrefix + epochStr,
 	}
 	sj.Handle = allocSchedJobId()
 	e.result <- sj.Handle
-
+	epoch, _ := s.ExpressionToEpoch(sj.Expression)
+	sj.Next = time.Unix(epoch, 0)
 	// persistent Cron Job
 	log.Debugf("add scheduled epoch job %+v", sj)
 	s.doAddEpochJob(sj, val)
@@ -745,4 +749,15 @@ func (s *Server) DeleteCronJob(cj *CronJob) error {
 	s.cronSvc.Remove(cron.EntryID(sj.CronEntryID))
 	log.Debugf("job `%v` successfully cancelled.\n", cj.Handle)
 	return nil
+}
+
+func (s *Server) ExpressionToEpoch(scdTime string) (int64, bool) {
+	if strings.HasPrefix(scdTime, EpochTimePrefix) {
+		value, err := strconv.ParseInt(scdTime[len(EpochTimePrefix):], 10, 64)
+		if err != nil {
+			log.Errorln(err)
+		}
+		return value, true
+	}
+	return 0, false
 }
