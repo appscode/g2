@@ -1,13 +1,13 @@
-hash: b2db837419def5ea723830c034919757a801b60ae8f0a232c850920c0ee724e5
-updated: 2016-12-26T17:09:07.456030381-08:00
+hash: a2688ff4bd2026ea3ec5af61016dfa2e42b0899e94ae3362d57b8dc9618a9f74
+updated: 2017-01-22T10:08:59.074475021-08:00
 imports:
 - name: github.com/appscode/go
-  version: 7995bcb0419b6ed977ca66d4482c3a625847270e
+  version: 10a1572c8fec8c70fe11a05cf6cf2d0034c3ea2a
   subpackages:
   - flags
   - runtime
 - name: github.com/appscode/log
-  version: 3f1acdeb89863d101e1d5fc0fefb478b1e990b28
+  version: 68e0e42e42c01371f3950571fc87c2298a51dd8f
   subpackages:
   - golog
 - name: github.com/go-macaron/inject
@@ -17,7 +17,7 @@ imports:
 - name: github.com/golang/glog
   version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/snappy
-  version: d9eb7a3d35ec988b8585d4a0068e462c27d28380
+  version: 7db9049039a047d955fe8c19b83c8ff5abd765c7
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/mikespook/golib
@@ -29,11 +29,11 @@ imports:
 - name: github.com/ngaut/stats
   version: 8564f986a400931e52c2261e4b784d812c854537
 - name: github.com/spf13/cobra
-  version: f62e98d28ab7ad31d707ba837a966378465c7b57
+  version: 9c28e4bbd74e5c3ed7aacbc552b2cab7cfdfe744
 - name: github.com/spf13/pflag
-  version: 5ccb023bc27df288a957c5e994cd44fd19619465
+  version: c7e63cf4530bcd3ba943729cee0efeff2ebea63f
 - name: github.com/syndtr/goleveldb
-  version: 6b4daa5362b502898ddf367c5c11deb9e7a5c727
+  version: 23851d93a2292dcc56e71a18ec9e0624d84a0f65
   subpackages:
   - leveldb
   - leveldb/cache
@@ -58,4 +58,18 @@ imports:
   subpackages:
   - bson
   - internal/json
-testImports: []
+- name: gopkg.in/robfig/cron.v2
+  version: be2e0b0deed5a68ffee390b4583a13aff8321535
+testImports:
+- name: github.com/davecgh/go-spew
+  version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
+  subpackages:
+  - spew
+- name: github.com/pmezard/go-difflib
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
+  subpackages:
+  - difflib
+- name: github.com/stretchr/testify
+  version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
+  subpackages:
+  - assert

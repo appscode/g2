@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/appscode/errors"
 	. "github.com/appscode/g2/pkg/runtime"
 	"github.com/appscode/g2/pkg/storage"
 	"github.com/appscode/log"
@@ -740,7 +739,7 @@ func (s *Server) DeleteCronJob(cj *CronJob) error {
 	sj, err := s.store.DeleteCronJob(cj)
 	if err == lberror.ErrNotFound {
 		log.Errorf("handle `%v` not found\n", cj.Handle)
-		return errors.NewGoError(fmt.Sprintf("handle `%v` not found", cj.Handle))
+		return fmt.Errorf("handle `%v` not found", cj.Handle)
 	}
 	if err != nil {
 		log.Errorln(err)

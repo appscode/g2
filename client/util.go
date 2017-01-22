@@ -1,12 +1,11 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/appscode/errors"
 )
 
 type bounds struct {
@@ -25,7 +24,7 @@ var (
 func ToEpoch(exp string) (int64, error) {
 	f := strings.Fields(exp)
 	if len(f) != 5 {
-		return 0, errors.NewGoError("expected 5 field")
+		return 0, errors.New("expected 5 field")
 	}
 	mi, err := validateAndGet(f[0], Minute)
 	if err != nil {
@@ -57,7 +56,7 @@ func validateAndGet(v string, b bounds) (int, error) {
 		return num, err
 	}
 	if num < b.low || num > b.high {
-		return num, errors.NewGoError(fmt.Sprintf("%v should be between %v and %v", b.t, b.low, b.high))
+		return num, fmt.Errorf("%v should be between %v and %v", b.t, b.low, b.high)
 	}
 	return num, nil
 }

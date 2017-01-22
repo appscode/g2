@@ -8,3 +8,5 @@ import:
 - package: github.com/appscode/go
 - package: github.com/appscode/log
 - package: github.com/spf13/pflag
+- package: gopkg.in/robfig/cron.v2
+  version: v2

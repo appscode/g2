@@ -4,13 +4,13 @@ package client
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/appscode/errors"
 	rt "github.com/appscode/g2/pkg/runtime"
 )
 
@@ -308,7 +308,7 @@ func (client *Client) DoCron(funcname string, cronExpr string, funcParam []byte)
 			return client.DoAt(funcname, epoch, funcParam)
 		}
 	default:
-		return "", errors.NewGoError("invalid cron expression")
+		return "", errors.New("invalid cron expression")
 
 	}
 }
