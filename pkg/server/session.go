@@ -43,8 +43,7 @@ func (se *session) handleConnection(s *Server, conn net.Conn) {
 			close(inbox) //notify writer to quit
 		}
 	}()
-
-	log.Debug("new sessionId", sessionId, "address:", conn.RemoteAddr())
+	log.Debugf("new session with sessionId %v and address: %v", sessionId, conn.RemoteAddr())
 
 	go queueingWriter(inbox, out)
 	go writer(conn, out)
@@ -70,16 +69,16 @@ func (se *session) handleBinaryConnection(s *Server, conn net.Conn, r *bufio.Rea
 	for {
 		tp, buf, err := ReadMessage(r)
 		if err != nil {
-			log.Debug(err, "sessionId", sessionId)
+			log.Debugf("%v with sessionId %v", err, sessionId)
 			return
 		}
 		args, ok := decodeArgs(tp, buf)
 		if !ok {
-			log.Debug("tp:", tp.String(), "argc not match", "details:", string(buf))
+			log.Debugf("pt: %v argc not match details: %v", tp.String(), string(buf))
 			return
 		}
 
-		log.Debug("sessionId", sessionId, "tp:", tp.String(), "len(args):", len(args), "details:", string(buf))
+		log.Debugf("sessionId: %v pt: %v len(args): %v details: %v", sessionId, tp.String(), len(args), string(buf))
 
 		switch tp {
 		case PT_CanDo, PT_CanDoTimeout: //todo: CAN_DO_TIMEOUT timeout support
@@ -107,7 +106,7 @@ func (se *session) handleBinaryConnection(s *Server, conn net.Conn, r *bufio.Rea
 			s.protoEvtCh <- e
 			job := (<-e.result).(*Job)
 			if job == nil {
-				log.Debug("sessionId", sessionId, "no job")
+				log.Debugf("sessionId %v has no job", sessionId)
 				sendReplyResult(inbox, nojobReply)
 				break
 			}
