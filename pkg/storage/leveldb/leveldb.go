@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"reflect"
 	"strings"
-	"sync"
 
 	. "github.com/appscode/g2/pkg/runtime"
 	"github.com/appscode/g2/pkg/storage"
@@ -16,7 +15,6 @@ import (
 )
 
 type LevelDbQ struct {
-	l  sync.RWMutex
 	db *leveldb.DB
 }
 
@@ -27,7 +25,7 @@ func New(dir string) (storage.Db, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &LevelDbQ{db: db, l: sync.RWMutex{}}, nil
+	return &LevelDbQ{db: db}, nil
 }
 
 func (q *LevelDbQ) AddJob(j *Job) error {
@@ -43,9 +41,6 @@ func (q *LevelDbQ) AddJob(j *Job) error {
 	if err != nil {
 		return err
 	}
-
-	q.l.Lock()
-	defer q.l.Unlock()
 	return q.db.Put([]byte(j.Handle), buf, nil)
 }
 
@@ -62,16 +57,11 @@ func (q *LevelDbQ) DeleteJob(j *Job, isSuccess bool) error {
 		}
 		q.AddCronJob(cj)
 	}
-	q.l.Lock()
-	defer q.l.Unlock()
 	return q.db.Delete([]byte(j.Handle), nil)
 }
 
 func (q *LevelDbQ) GetJob(handle string) (*Job, error) {
-	q.l.RLock()
 	data, err := q.db.Get([]byte(handle), nil)
-	q.l.RUnlock()
-
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +74,6 @@ func (q *LevelDbQ) GetJob(handle string) (*Job, error) {
 }
 
 func (q *LevelDbQ) GetJobs() ([]*Job, error) {
-	q.l.RLock()
-	defer q.l.RUnlock()
 	jobs := make([]*Job, 0)
 	iter := q.db.NewIterator(util.BytesPrefix([]byte(JobPrefix)), nil)
 	for iter.Next() {
@@ -111,8 +99,6 @@ func (q *LevelDbQ) AddCronJob(sj *CronJob) error {
 	if err != nil {
 		return err
 	}
-	q.l.Lock()
-	defer q.l.Unlock()
 	return q.db.Put([]byte(sj.Handle), buf, nil)
 }
 
@@ -133,9 +119,7 @@ func (q *LevelDbQ) UpdateCronJob(handle string, updatedValue map[string]interfac
 }
 
 func (q *LevelDbQ) GetCronJob(handle string) (*CronJob, error) {
-	q.l.RLock()
 	data, err := q.db.Get([]byte(handle), nil)
-	q.l.RUnlock()
 
 	if err != nil {
 		return nil, err
@@ -153,15 +137,11 @@ func (q *LevelDbQ) DeleteCronJob(sj *CronJob) (*CronJob, error) {
 	if err != nil {
 		return nil, err
 	}
-	q.l.Lock()
-	defer q.l.Unlock()
 	return cj, q.db.Delete([]byte(cj.Handle), nil)
 }
 
 func (q *LevelDbQ) GetCronJobs() ([]*CronJob, error) {
 	cronJobs := make([]*CronJob, 0)
-	q.l.RLock()
-	defer q.l.RUnlock()
 	iter := q.db.NewIterator(util.BytesPrefix([]byte(SchedJobPrefix)), nil)
 	for iter.Next() {
 		// key := iter.Key()

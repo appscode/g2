@@ -2,6 +2,8 @@
 package main
 
 import (
+	"os"
+
 	gearmand "github.com/appscode/g2/pkg/server"
 	"github.com/appscode/g2/pkg/storage"
 	"github.com/appscode/g2/pkg/storage/leveldb"
@@ -10,12 +12,11 @@ import (
 	"github.com/appscode/log"
 	logs "github.com/appscode/log/golog"
 	"github.com/spf13/pflag"
-	"os"
 )
 
 var (
-	addr        string
-	storageDir  string
+	addr       string
+	storageDir string
 )
 
 func main() {

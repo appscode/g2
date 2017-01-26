@@ -2,10 +2,10 @@ package client
 
 import (
 	"testing"
+	"time"
 
 	rt "github.com/appscode/g2/pkg/runtime"
 	"github.com/appscode/log"
-	"time"
 )
 
 const (
