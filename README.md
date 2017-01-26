@@ -163,7 +163,11 @@ Acknowledgement
  * Gearadmin client forked from https://github.com/Clever/gearadmin
  * Gearman project (http://gearman.org/protocol/)
 
-Open Source - MIT Software License
+License
 ==================================
+Apache 2.0. See [LICENSE](LICENSE).
 
-See LICENSE.
+- Copyright (C) 2016-2017 by AppsCode Inc.
+- Copyright (C) 2016 by Clever.com (portions of gearadmin client)
+- Copyright (c) 2014 [ngaut](https://github.com/ngaut) (portions of gearmand)
+- Copyright (C) 2011 by Xing Xing (portions of client and worker)
