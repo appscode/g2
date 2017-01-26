@@ -20,20 +20,23 @@ const (
 // It can connect to multi-server and grab jobs.
 type Worker struct {
 	sync.Mutex
-	agents   []*agent
-	funcs    jobFuncs
-	in       chan *inPack
-	running  bool
-	ready    bool
-	disabled bool
-	once     sync.Once
+	agents  []*agent
+	funcs   jobFuncs
+	in      chan *inPack
+	running bool
+	ready   bool
+	// The shuttingDown variable is protected by the Worker lock
+	shuttingDown bool
+	// Used during shutdown to wait for all active jobs to finish
+	activeJobs sync.WaitGroup
+
+	// once protects registering jobs multiple times
+	once sync.Once
 
 	Id           string
 	ErrorHandler ErrorHandler
 	JobHandler   JobHandler
 	limit        chan bool
-
-	runningJobs int
 }
 
 // Return a worker.
@@ -45,10 +48,9 @@ type Worker struct {
 // OneByOne(=1), there will be only one job executed in a time.
 func New(limit int) (worker *Worker) {
 	worker = &Worker{
-		agents:      make([]*agent, 0, limit),
-		funcs:       make(jobFuncs),
-		in:          make(chan *inPack, rt.QueueSize),
-		runningJobs: 0,
+		agents: make([]*agent, 0, limit),
+		funcs:  make(jobFuncs),
+		in:     make(chan *inPack, rt.QueueSize),
 	}
 	if limit != Unlimited {
 		worker.limit = make(chan bool, limit-1)
@@ -149,7 +151,9 @@ func (worker *Worker) handleInPack(inpack *inPack) {
 	case rt.PT_NoJob:
 		inpack.a.PreSleep()
 	case rt.PT_Noop:
-		inpack.a.Grab()
+		if !worker.isShuttingDown() {
+			inpack.a.Grab()
+		}
 	case rt.PT_JobAssign, rt.PT_JobAssignUniq:
 		go func() {
 			if err := worker.exec(inpack); err != nil {
@@ -159,7 +163,9 @@ func (worker *Worker) handleInPack(inpack *inPack) {
 		if worker.limit != nil {
 			worker.limit <- true
 		}
-		inpack.a.Grab()
+		if !worker.isShuttingDown() {
+			inpack.a.Grab()
+		}
 	case rt.PT_Error:
 		worker.err(inpack.Err())
 		fallthrough
@@ -279,13 +285,10 @@ func (worker *Worker) SetId(id string) {
 
 // inner job executing
 func (worker *Worker) exec(inpack *inPack) (err error) {
-	jobRunned := false
 	defer func() {
 		// decrement job counter in completion of this job
 		worker.Lock()
-		if worker.runningJobs > 0 && jobRunned {
-			worker.runningJobs--
-		}
+		worker.activeJobs.Done()
 		worker.Unlock()
 		if worker.limit != nil {
 			<-worker.limit
@@ -298,15 +301,15 @@ func (worker *Worker) exec(inpack *inPack) (err error) {
 			}
 		}
 	}()
+	worker.activeJobs.Add(1)
+	if worker.isShuttingDown() {
+		return
+	}
+
 	f, ok := worker.funcs[inpack.fn]
 	if !ok {
 		return fmt.Errorf("The function does not exist: %s", inpack.fn)
 	}
-	jobRunned = true
-	// Job function found, function will be executing now, increment counter
-	worker.Lock()
-	worker.runningJobs++
-	worker.Unlock()
 
 	var r *result
 	if f.timeout == 0 {
@@ -343,35 +346,20 @@ func (worker *Worker) reRegisterFuncsForAgent(a *agent) {
 
 }
 
-// Counts running jobs
-func (worker *Worker) Count() int {
+func (worker *Worker) Shutdown() {
 	worker.Lock()
-	defer worker.Unlock()
-
-	return worker.runningJobs
+	worker.shuttingDown = true
+	worker.Unlock()
+	// Wait for all the active jobs to finish
+	worker.activeJobs.Wait()
+	worker.Close()
 }
 
-// Stops accepting new jobs
-func (worker *Worker) Disable() {
+// IsShutdown checks to see if the worker is in the process of being shutdown.
+func (worker *Worker) isShuttingDown() bool {
 	worker.Lock()
 	defer worker.Unlock()
-
-	worker.disabled = true
-}
-
-// Renewable disabled workers
-func (worker *Worker) Enable() {
-	worker.Lock()
-	defer worker.Unlock()
-
-	worker.disabled = false
-}
-
-func (worker *Worker) IsDisabled() bool {
-	worker.Lock()
-	defer worker.Unlock()
-
-	return worker.disabled
+	return worker.shuttingDown
 }
 
 // inner result

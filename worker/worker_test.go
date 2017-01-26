@@ -2,13 +2,13 @@ package worker
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/appscode/g2/client"
-	rt "github.com/appscode/g2/pkg/runtime"
+	"github.com/appscode/g2/pkg/runtime"
 )
 
 var worker *Worker
@@ -16,6 +16,10 @@ var worker *Worker
 func init() {
 	worker = New(Unlimited)
 }
+
+const (
+	Network = "tcp4"
+)
 
 func TestWorkerErrNoneAgents(t *testing.T) {
 	err := worker.Ready()
@@ -26,7 +30,7 @@ func TestWorkerErrNoneAgents(t *testing.T) {
 
 func TestWorkerAddServer(t *testing.T) {
 	t.Log("Add local server 127.0.0.1:4730.")
-	if err := worker.AddServer(rt.Network, "127.0.0.1:4730"); err != nil {
+	if err := worker.AddServer(Network, "127.0.0.1:4730"); err != nil {
 		t.Error(err)
 	}
 
@@ -87,7 +91,7 @@ func TestLargeDataWork(t *testing.T) {
 	worker := New(Unlimited)
 	defer worker.Close()
 
-	if err := worker.AddServer(rt.Network, "127.0.0.1:4730"); err != nil {
+	if err := worker.AddServer(Network, "127.0.0.1:4730"); err != nil {
 		t.Error(err)
 	}
 	worker.Ready()
@@ -146,7 +150,7 @@ func TestWorkerClose(t *testing.T) {
 func TestWorkWithoutReady(t *testing.T) {
 	other_worker := New(Unlimited)
 
-	if err := other_worker.AddServer(rt.Network, "127.0.0.1:4730"); err != nil {
+	if err := other_worker.AddServer(Network, "127.0.0.1:4730"); err != nil {
 		t.Error(err)
 	}
 	if err := other_worker.AddFunc("gearman-go-workertest", foobar, 0); err != nil {
@@ -228,97 +232,136 @@ func TestWorkWithoutReadyWithPanic(t *testing.T) {
 
 }
 
-func TestDisableWorkersAndCountRunningJobs(t *testing.T) {
-	worker := New(Unlimited)
-	defer worker.Close()
-
-	if err := worker.AddServer(rt.Network, "127.0.0.1:4730"); err != nil {
+// initWorker creates a worker and adds the localhost server to it
+func initWorker(t *testing.T) *Worker {
+	otherWorker := New(Unlimited)
+	if err := otherWorker.AddServer(Network, "127.0.0.1:4730"); err != nil {
 		t.Error(err)
 	}
-	worker.Ready()
+	return otherWorker
+}
 
+// submitEmptyInPack sends an empty inpack with the specified fn name to the worker. It uses
+// the first agent of the worker.
+func submitEmptyInPack(t *testing.T, worker *Worker, function string) {
+	if l := len(worker.agents); l != 1 {
+		t.Error("The worker has no agents")
+	}
+	inpack := getInPack()
+	inpack.dataType = runtime.PT_JobAssign
+	inpack.fn = function
+	inpack.a = worker.agents[0]
+	worker.in <- inpack
+}
+
+// TestShutdownSuccessJob tests that shutdown handles active jobs that will succeed
+func TestShutdownSuccessJob(t *testing.T) {
+	otherWorker := initWorker(t)
+	finishedJob := false
 	var wg sync.WaitGroup
-	handler := func(job Job) ([]byte, error) {
-		fmt.Println("running job")
-		time.Sleep(time.Second * 20)
-		fmt.Println("done")
+	successJob := func(job Job) ([]byte, error) {
 		wg.Done()
+		// Sleep for 10ms to ensure that the shutdown waits for this to finish
+		time.Sleep(time.Duration(10 * time.Millisecond))
+		finishedJob = true
 		return nil, nil
 	}
-
-	if err := worker.AddFunc("handler", handler, 0); err != nil {
-		wg.Done()
+	if err := otherWorker.AddFunc("test", successJob, 0); err != nil {
 		t.Error(err)
 	}
-	//worker.JobHandler = handler
-
-	worker.ErrorHandler = func(err error) {
-		t.Fatal("shouldn't have received an error")
-	}
-
-	if err := worker.Ready(); err != nil {
+	if err := otherWorker.Ready(); err != nil {
 		t.Error(err)
 		return
 	}
-	go worker.Work()
-
-	var cli *client.Client
-	var err error
-	if cli, err = client.New(rt.Network, "127.0.0.1:4730"); err != nil {
-		t.Fatal(err)
+	submitEmptyInPack(t, otherWorker, "test")
+	go otherWorker.Work()
+	// Wait for the success_job to start so that we know we didn't shutdown before even
+	// beginning to process the job.
+	wg.Add(1)
+	wg.Wait()
+	otherWorker.Shutdown()
+	if !finishedJob {
+		t.Error("Didn't finish job")
 	}
-	cli.ErrorHandler = func(e error) {
-		t.Error(e)
+}
+
+// TestShutdownFailureJob tests that shutdown handles active jobs that will fail
+func TestShutdownFailureJob(t *testing.T) {
+	otherWorker := initWorker(t)
+	var wg sync.WaitGroup
+	finishedJob := false
+	failureJob := func(job Job) ([]byte, error) {
+		wg.Done()
+		// Sleep for 10ms to ensure that shutdown waits for this to finish
+		time.Sleep(time.Duration(10 * time.Millisecond))
+		finishedJob = true
+		return nil, errors.New("Error!")
 	}
 
-	worker.Disable()
-	if worker.IsDisabled() {
-		wg.Add(1)
-		_, err = cli.Do("handler", bytes.Repeat([]byte("a"), 50), rt.JobHigh, func(res *client.Response) {
-		})
-		if err != nil {
-			t.Error(err)
-		}
-
-		wg.Add(1)
-		_, err = cli.Do("handler", bytes.Repeat([]byte("a"), 50), rt.JobHigh, func(res *client.Response) {
-		})
-		if err != nil {
-			t.Error(err)
-		}
-
-		go func() {
-			for {
-				time.Sleep(time.Second * 10)
-				if worker.Count() > 0 {
-					fmt.Println("worker enabled", worker.Count())
-					break
-				} else {
-					fmt.Println("worker do not have any jobs")
-				}
-			}
-		}()
-
-		time.Sleep(time.Second * 50)
-		wg.Add(1)
-		_, err = cli.Do("handler", bytes.Repeat([]byte("a"), 50), rt.JobHigh, func(res *client.Response) {
-		})
-		if err != nil {
-			t.Error(err)
-		}
-
-		worker.Enable()
-		if !worker.IsDisabled() {
-			fmt.Println("worker is enabled")
-			time.Sleep(time.Second)
-			for i := 1; i < 10; i++ {
-				fmt.Println("Running Job", worker.Count())
-			}
-		} else {
-			t.Fatal("worker should enabled now")
-		}
-		wg.Wait()
-	} else {
-		t.Fatal("worker should disabled")
+	if err := otherWorker.AddFunc("test", failureJob, 0); err != nil {
+		t.Error(err)
 	}
+	if err := otherWorker.Ready(); err != nil {
+		t.Error(err)
+		return
+	}
+	submitEmptyInPack(t, otherWorker, "test")
+	go otherWorker.Work()
+	// Wait for the failure_job to start so that we know we didn't shutdown before even
+	// beginning to process the job.
+	wg.Add(1)
+	wg.Wait()
+	otherWorker.Shutdown()
+	if !finishedJob {
+		t.Error("Didn't finish the failed job")
+	}
+}
+
+func TestSubmitMultipleJobs(t *testing.T) {
+	otherWorker := initWorker(t)
+	var startJobs sync.WaitGroup
+	startJobs.Add(2)
+	var jobsFinished int32 = 0
+	job := func(job Job) ([]byte, error) {
+		startJobs.Done()
+		// Sleep for 10ms to ensure that the shutdown waits for this to finish
+		time.Sleep(time.Duration(10 * time.Millisecond))
+		atomic.AddInt32(&jobsFinished, 1)
+		return nil, nil
+	}
+	if err := otherWorker.AddFunc("test", job, 0); err != nil {
+		t.Error(err)
+	}
+	if err := otherWorker.Ready(); err != nil {
+		t.Error(err)
+		return
+	}
+	submitEmptyInPack(t, otherWorker, "test")
+	submitEmptyInPack(t, otherWorker, "test")
+	go otherWorker.Work()
+	startJobs.Wait()
+	otherWorker.Shutdown()
+	if jobsFinished != 2 {
+		t.Error("Didn't run both jobs")
+	}
+}
+
+func TestSubmitJobAfterShutdown(t *testing.T) {
+	otherWorker := initWorker(t)
+	noRunJob := func(job Job) ([]byte, error) {
+		t.Error("This job shouldn't have been run")
+		return nil, nil
+	}
+	if err := otherWorker.AddFunc("test", noRunJob, 0); err != nil {
+		t.Error(err)
+	}
+	if err := otherWorker.Ready(); err != nil {
+		t.Error(err)
+		return
+	}
+	go otherWorker.Work()
+	otherWorker.Shutdown()
+	submitEmptyInPack(t, otherWorker, "test")
+	// Sleep for 10ms to make sure that the job doesn't run
+	time.Sleep(time.Duration(10 * time.Millisecond))
 }

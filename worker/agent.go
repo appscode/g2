@@ -57,7 +57,7 @@ func (a *agent) work() {
 	var err error
 	var data, leftdata []byte
 	for {
-		if !a.worker.IsDisabled() {
+		if !a.worker.isShuttingDown() {
 			if data, err = a.read(); err != nil {
 				if opErr, ok := err.(*net.OpError); ok {
 					if opErr.Temporary() {
