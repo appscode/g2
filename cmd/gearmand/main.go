@@ -10,25 +10,22 @@ import (
 	"github.com/appscode/log"
 	logs "github.com/appscode/log/golog"
 	"github.com/spf13/pflag"
+	"os"
 )
 
 var (
 	addr        string
-	coredumpDir string
 	storageDir  string
 )
 
 func main() {
 	pflag.StringVar(&addr, "addr", ":4730", "listening on, such as 0.0.0.0:4730")
-	pflag.StringVar(&coredumpDir, "coredump", "./", "coredump file path")
-	pflag.StringVar(&storageDir, "storage-dir", "", "Directory where LevelDB file is stored.")
+	pflag.StringVar(&storageDir, "storage-dir", os.TempDir(), "Directory where LevelDB file is stored.")
 
 	flags.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 	flags.DumpAll()
-
-	gearmand.RegisterCoreDump(coredumpDir)
 
 	var store storage.Db
 	if storageDir != "" {

@@ -329,17 +329,6 @@ func createResCh() chan interface{} {
 	return make(chan interface{}, 1)
 }
 
-func RegisterCoreDump(path string) {
-	if crashFile, err := os.OpenFile(fmt.Sprintf("%v--crash.log", path), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0664); err == nil {
-		crashFile.WriteString(fmt.Sprintf("pid %d Opened crashfile at %v\n", os.Getpid(), time.Now()))
-		os.Stderr = crashFile
-		//todo:windows do not have Dup2 function
-		//syscall.Dup2(int(crashFile.Fd()), 2)
-	} else {
-		println(err.Error())
-	}
-}
-
 func PublishCmdline() {
 	var cmdline string
 	for _, arg := range os.Args {
