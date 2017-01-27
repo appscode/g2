@@ -74,11 +74,11 @@ func (se *session) handleBinaryConnection(s *Server, conn net.Conn, r *bufio.Rea
 		}
 		args, ok := decodeArgs(tp, buf)
 		if !ok {
-			log.Debugf("pt: %v argc not match details: %v", tp.String(), string(buf))
+			log.Debugf("protocol: %v argc not match details: %s", tp.String(), string(buf))
 			return
 		}
 
-		log.Debugf("sessionId: %v pt: %v len(args): %v details: %v", sessionId, tp.String(), len(args), string(buf))
+		log.Debugf("incoming<= sessionId: %v protocol: %v len(args): %v details: %s", sessionId, tp.String(), len(args), string(buf))
 
 		switch tp {
 		case PT_CanDo, PT_CanDoTimeout: //todo: CAN_DO_TIMEOUT timeout support
@@ -111,7 +111,6 @@ func (se *session) handleBinaryConnection(s *Server, conn net.Conn, r *bufio.Rea
 				break
 			}
 
-			//log.Debugf("%+v", job)
 			sendReply(inbox, PT_JobAssignUniq, [][]byte{
 				[]byte(job.Handle), []byte(job.FuncName), []byte(job.Id), job.Data})
 		case PT_SubmitJobLow, PT_SubmitJob, PT_SubmitJobHigh, PT_SubmitJobLowBG, PT_SubmitJobBG, PT_SubmitJobHighBG:

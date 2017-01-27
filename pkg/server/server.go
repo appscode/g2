@@ -60,7 +60,7 @@ func (s *Server) loadAllJobs() {
 	for _, j := range jobs {
 		j.ProcessBy = 0 //no body handle it now
 		j.CreateBy = 0  //clear
-		log.Debugf("handle: %v\tfunc: %v\tbg: %v", j.Handle, j.FuncName, j.IsBackGround)
+		log.Debugf("handle: %v\tfunc: %v\tis_background: %v", j.Handle, j.FuncName, j.IsBackGround)
 		s.doAddJob(j)
 	}
 }
@@ -127,7 +127,6 @@ func (s *Server) addWorker(l *list.List, w *Worker) {
 func (s *Server) removeWorker(l *list.List, sessionId int64) {
 	for it := l.Front(); it != nil; it = it.Next() {
 		if it.Value.(*Worker).SessionId == sessionId {
-			log.Debugf("removeWorker sessionId %d", sessionId)
 			l.Remove(it)
 			return
 		}
@@ -309,7 +308,7 @@ func (s *Server) handleCloseSession(e *event) error {
 			log.Fatalf("sessionId not match %d-%d, bug found", sessionId, w.SessionId)
 		}
 		s.removeWorkerBySessionId(w.SessionId)
-
+		log.Debugf("worker with sessionId: %v unregistered.", sessionId)
 		//reschedule these jobs, so other workers can handle it
 		for handle, j := range w.runningJobs {
 			if handle != j.Handle {
@@ -617,6 +616,7 @@ func (s *Server) handleProtoEvt(e *event) {
 		w := args.t0.(*Worker)
 		funcName := args.t1.(string)
 		s.handleCanDo(funcName, w)
+		log.Debugf("worker with sessionId: %v add function `%v`", w.SessionId, funcName)
 	case PT_CantDo:
 		sessionId := e.fromSessionId
 		funcName := args.t0.(string)
@@ -624,6 +624,7 @@ func (s *Server) handleProtoEvt(e *event) {
 			s.removeWorker(jw.workers, sessionId)
 		}
 		delete(s.worker[sessionId].canDo, funcName)
+		log.Debugf("worker with sessionId: %v remove function `%v`", sessionId, funcName)
 	case PT_SetClientId:
 		w := args.t0.(*Worker)
 		w.workerId = args.t1.(string)
@@ -631,6 +632,7 @@ func (s *Server) handleProtoEvt(e *event) {
 		w := args.t0.(*Worker)
 		funcName := args.t1.(string)
 		s.handleCanDo(funcName, w)
+		log.Debugf("worker with sessionId: %v add function `%v`", w.SessionId, funcName)
 	case PT_GrabJobUniq:
 		sessionId := e.fromSessionId
 		w, ok := s.worker[sessionId]
