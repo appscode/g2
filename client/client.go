@@ -12,6 +12,7 @@ import (
 	"time"
 
 	rt "github.com/appscode/g2/pkg/runtime"
+	"github.com/appscode/log"
 )
 
 var (
@@ -23,12 +24,12 @@ var (
 type Client struct {
 	sync.Mutex
 
-	net, addr, lastcall string
-	respHandler         *responseHandlerMap
-	innerHandler        *responseHandlerMap
-	in                  chan *Response
-	conn                net.Conn
-	rw                  *bufio.ReadWriter
+	net, addr    string
+	respHandler  *responseHandlerMap
+	innerHandler *responseHandlerMap
+	in           chan *Response
+	conn         net.Conn
+	rw           *bufio.ReadWriter
 
 	ResponseTimeout time.Duration // response timeout for do() in ms
 
@@ -171,12 +172,8 @@ func (client *Client) processLoop() {
 	for resp := range client.in {
 		switch resp.DataType {
 		case rt.PT_Error:
-			if client.lastcall != "" {
-				resp = client.handleInner(client.lastcall, resp)
-				client.lastcall = ""
-			} else {
-				client.err(getError(resp.Data))
-			}
+			log.Errorln("Received error", resp.Data)
+			client.err(getError(resp.Data))
 		case rt.PT_StatusRes:
 			resp = client.handleInner("s"+resp.Handle, resp)
 		case rt.PT_JobCreated:
@@ -225,7 +222,6 @@ func (client *Client) do(funcname string, data []byte, flag rt.PT) (handle strin
 		return "", ErrLostConn
 	}
 	var result = make(chan handleOrError, 1)
-	client.lastcall = "c"
 	client.innerHandler.put("c", func(resp *Response) {
 		if resp.DataType == rt.PT_Error {
 			err = getError(resp.Data)
@@ -240,7 +236,6 @@ func (client *Client) do(funcname string, data []byte, flag rt.PT) (handle strin
 	req.DataType = flag
 	if err = client.write(req); err != nil {
 		client.innerHandler.remove("c")
-		client.lastcall = ""
 		return
 	}
 	var timer = time.After(client.ResponseTimeout * time.Millisecond)
@@ -249,7 +244,6 @@ func (client *Client) do(funcname string, data []byte, flag rt.PT) (handle strin
 		return ret.handle, ret.err
 	case <-timer:
 		client.innerHandler.remove("c")
-		client.lastcall = ""
 		return "", ErrLostConn
 	}
 	return
@@ -339,7 +333,6 @@ func (client *Client) Status(handle string) (status *Status, err error) {
 	}
 	var mutex sync.Mutex
 	mutex.Lock()
-	client.lastcall = "s" + handle
 	client.innerHandler.put("s"+handle, func(resp *Response) {
 		defer mutex.Unlock()
 		var err error
@@ -370,7 +363,6 @@ func (client *Client) Echo(data []byte) (echo []byte, err error) {
 	req := getRequest()
 	req.DataType = rt.PT_EchoReq
 	req.Data = data
-	client.lastcall = "e"
 	client.write(req)
 	mutex.Lock()
 	return
