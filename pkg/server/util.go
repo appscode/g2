@@ -84,7 +84,7 @@ func allocJobId() string {
 }
 
 func allocSchedJobId() string {
-	return runtime.SchedJobPrefix + <-idCh
+	return runtime.CronJobPrefix + <-idCh
 }
 
 func IsValidJobHandle(handle string) bool {
@@ -92,7 +92,7 @@ func IsValidJobHandle(handle string) bool {
 }
 
 func IsValidCronJobHandle(handle string) bool {
-	return strings.HasPrefix(handle, runtime.SchedJobPrefix)
+	return strings.HasPrefix(handle, runtime.CronJobPrefix)
 }
 
 type event struct {
@@ -167,6 +167,11 @@ func sendTextOK(out chan []byte) {
 
 func sendTextError(out chan []byte, errmsg string) {
 	out <- []byte(fmt.Sprintf("Error: %s\n", errmsg))
+}
+
+func sendTimeoutException(out chan []byte, handle string, exception string) {
+	data := [][]byte{[]byte(handle), []byte(exception)}
+	out <- constructReply(runtime.PT_WorkException, data)
 }
 
 func constructReply(tp runtime.PT, data [][]byte) []byte {

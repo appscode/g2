@@ -82,8 +82,9 @@ const (
 	Req    = 5391697
 	ReqStr = "\x00REQ"
 	// \x00RES
-	Res    = 5391699
-	ResStr = "\x00RES"
+	Res            = 5391699
+	ResStr         = "\x00RES"
+	DefaultTimeout = 20 // 20 Seconds
 
 	HANDLE_SHAKE_HEADER_LENGTH = 12
 )

@@ -1,6 +1,8 @@
 package client
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,7 +50,7 @@ func TestClientEcho(t *testing.T) {
 }
 
 func TestClientDoBg(t *testing.T) {
-	handle, err := client.DoBg("ToUpper", []byte("abcdef"), rt.JobNormal)
+	handle, err := client.DoBg("scheduledJobTest", []byte("abcdef"), rt.JobNormal)
 	if err != nil {
 		t.Error(err)
 		return
@@ -61,7 +63,7 @@ func TestClientDoBg(t *testing.T) {
 }
 
 func TestClientDoCron(t *testing.T) {
-	handle, err := client.DoCron("scheduledJobTest", "* * * * *", []byte("test data"))
+	handle, err := client.DoCron("scheduledJobTest", "* * * * 5", []byte("test data"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +75,7 @@ func TestClientDoCron(t *testing.T) {
 }
 
 func TestClientDoAt(t *testing.T) {
-	handle, err := client.DoAt("scheduledJobTest", time.Now().Add(10*time.Second).Unix(), []byte("test data"))
+	handle, err := client.DoAt("scheduledJobTest", time.Now().Add(20*time.Second).Unix(), []byte("test data"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,17 +87,28 @@ func TestClientDoAt(t *testing.T) {
 }
 
 func TestClientDo(t *testing.T) {
+	var wg sync.WaitGroup = sync.WaitGroup{}
+	wg.Add(1)
 	jobHandler := func(job *Response) {
-		str := string(job.Data)
-		if str == "ABCDEF" {
-			t.Log(str)
-		} else {
-			t.Errorf("Invalid data: %s", job.Data)
+		switch job.DataType {
+		case rt.PT_WorkComplete:
+			t.Log("Work complete, handle ", job.Handle)
+			wg.Done()
+		case rt.PT_WorkException, rt.PT_WorkFail:
+			t.Log("Work fail, handle ", job.Handle, " cause: ", string(job.Data))
+			wg.Done()
+		case rt.PT_WorkData:
+			t.Logf("Work data: %+v", string(job.Data))
+		case rt.PT_WorkStatus:
+			status, err := job.Status()
+			if err != nil {
+				t.Error(err)
+			}
+			fmt.Println("Work status, num: %v, denom: %v", status.Numerator, status.Denominator)
 		}
-		return
 	}
-	handle, err := client.Do("ToUpper", []byte("abcdef"),
-		rt.JobLow, jobHandler)
+	handle, err := client.Do("scheduledJobTest", []byte("abcdef"),
+		rt.JobHigh, jobHandler)
 	if err != nil {
 		t.Error(err)
 		return
@@ -105,6 +118,8 @@ func TestClientDo(t *testing.T) {
 	} else {
 		t.Log(handle)
 	}
+	wg.Wait()
+
 }
 
 func TestClientStatus(t *testing.T) {

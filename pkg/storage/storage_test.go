@@ -12,25 +12,39 @@ import (
 	. "github.com/appscode/g2/pkg/runtime"
 	. "github.com/appscode/g2/pkg/storage"
 	. "github.com/appscode/g2/pkg/storage/leveldb"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
-	db JobQueue
+	db ItemQueue
 )
 
 var testJobs = []*Job{
 	{Handle: JobPrefix + "handle0_", Id: "id0_",
-		Data: []byte("data0_"), CreateAt: time.Now().UTC(), FuncName: "funcName0_", Priority: 0},
+		Data: []byte("data0_"), CreateAt: time.Now(), ProcessAt: time.Now(), FuncName: "funcName0_", Priority: 0},
 	{Handle: JobPrefix + "", Id: "id1_",
-		Data: []byte("data1_"), CreateAt: time.Now().UTC(), FuncName: "funcName1_", Priority: 1},
+		Data: []byte("data1_"), CreateAt: time.Now().UTC(), ProcessAt: time.Now(), FuncName: "funcName1_", Priority: 1},
 	{Handle: JobPrefix + "handle2_", Id: "id2_",
-		Data: []byte("data2_"), FuncName: "funcName2_", Priority: 2},
+		Data: []byte("data2_"), FuncName: "funcName2_", CreateAt: time.Now().UTC(), ProcessAt: time.Now().UTC(), Priority: 2},
 	{Handle: JobPrefix + "handle3_", Id: "id3_",
-		CreateAt: time.Now().UTC(), FuncName: "funcName3_", Priority: 3},
+		CreateAt: time.Now().UTC(), ProcessAt: time.Now().UTC(), FuncName: "funcName3_", Priority: 3},
 	{Handle: JobPrefix + "handle4_", Id: "id4_",
-		Data: []byte(""), CreateAt: time.Now().UTC(), FuncName: "funcName4_", Priority: 4},
+		CreateAt: time.Now().UTC(), ProcessAt: time.Now().UTC(), FuncName: "funcName4_", Priority: 4},
 	{Handle: JobPrefix + "handle5_", Id: "id5_",
-		Data: []byte("don't store"), FuncName: "funcName5_", Priority: 5},
+		Data: []byte("don't store"), FuncName: "funcName5_", CreateAt: time.Now().UTC(), ProcessAt: time.Now().UTC(), Priority: 5},
+}
+
+var testCronJobs = []*CronJob{
+	{JobTemplete: *testJobs[0], Handle: CronJobPrefix + "handle0_", CronEntryID: 1, Expression: "* * 1 * *",
+		Next: time.Now().Add(10), Prev: time.Now().Add(-10), Created: 1},
+	{JobTemplete: *testJobs[0], Handle: CronJobPrefix + "handle1_", CronEntryID: 2, Expression: "* * 2 * *",
+		Next: time.Now().Add(10), Prev: time.Now().Add(-10), Created: 2},
+	{JobTemplete: *testJobs[0], Handle: CronJobPrefix + "handle2_", CronEntryID: 3, Expression: "* * 3 * *",
+		Next: time.Now().Add(10), Prev: time.Now().Add(-10), Created: 3},
+	{JobTemplete: *testJobs[0], Handle: CronJobPrefix + "handle3_", CronEntryID: 4, Expression: "* * 4 * *",
+		Next: time.Now().Add(10), Prev: time.Now().Add(-10), Created: 4},
+	{JobTemplete: *testJobs[0], Handle: CronJobPrefix + "handle4_", CronEntryID: 5, Expression: "* * 5 * *",
+		Next: time.Now().Add(10), Prev: time.Now().Add(-10), Created: 5},
 }
 
 func init() {
@@ -47,28 +61,60 @@ func init() {
 	}
 }
 
-func TestAddAndGetJob(t *testing.T) {
-	testGetJob(t, db, nil)
-
-	var jobs []*Job
-	for i := 0; i < 2; i++ {
-		for _, j := range testJobs {
-			if i == 5 {
-				continue
+func TestAll(t *testing.T) {
+	//Add test
+	for _, j := range testJobs {
+		testAdd(t, db, j)
+	}
+	for _, cj := range testCronJobs {
+		testAdd(t, db, cj)
+	}
+	//get test
+	for _, j := range testJobs {
+		jn := &Job{Handle: j.Handle}
+		testGet(t, db, jn)
+		assert.Equal(t, j, jn)
+	}
+	for _, cj := range testCronJobs {
+		cjn := &CronJob{Handle: cj.Handle}
+		testGet(t, db, cjn)
+		assert.Equal(t, cj, cjn)
+	}
+	//get all test
+	allJobs := testGetAll(t, db, &Job{})
+	for _, j := range testJobs {
+		var found bool = false
+		for _, aj := range allJobs {
+			if aj.(*Job).Handle == j.Handle {
+				found = true
+				assert.Equal(t, j, aj)
 			}
-			testAddjob(t, db, j)
-			jobs = append(jobs, j)
+		}
+		if !found {
+			t.Fatalf("job not found with handle %v", j.Handle)
 		}
 	}
-	testGetJob(t, db, jobs[0:len(testJobs)])
-}
 
-func TestDoneJob(t *testing.T) {
-	for i := 0; i < 2; i++ {
-		for _, job := range testJobs {
-			testDoneJob(t, db, job)
+	allCronJobs := testGetAll(t, db, &CronJob{})
+	for _, j := range testCronJobs {
+		var found bool = false
+		for _, aj := range allCronJobs {
+			if aj.(*CronJob).Handle == j.Handle {
+				found = true
+				assert.Equal(t, j, aj)
+			}
+		}
+		if !found {
+			t.Fatalf("cron job not found with handle %v", j.Handle)
 		}
 	}
+	//Delete test
+	testDelete(t, db, testJobs[0])
+	testDelete(t, db, testCronJobs[0])
+	allJobs = testGetAll(t, db, &Job{})
+	allCronJobs = testGetAll(t, db, &CronJob{})
+	assert.Equal(t, len(testJobs)-1, len(allJobs))
+	assert.Equal(t, len(testCronJobs)-1, len(allCronJobs))
 }
 
 func BenchmarkBasicOpts(b *testing.B) {
@@ -86,9 +132,10 @@ func BenchmarkBasicOpts(b *testing.B) {
 			t := &testing.T{}
 
 			for _, j := range jobs {
-				testAddjob(t, db, j)
+				testAdd(t, db, j)
+				testGet(t, db, j)
 			}
-			testGetJob(t, db, jobs)
+			testGetAll(t, db, &Job{})
 		}()
 	}
 	wg.Wait()
@@ -101,36 +148,36 @@ func BenchmarkBasicOpts(b *testing.B) {
 			t := &testing.T{}
 
 			for _, j := range jobs {
-				testDoneJob(t, db, j)
+				testDelete(t, db, j)
 			}
 		}()
 	}
 	wg.Wait()
 }
 
-func testAddjob(t *testing.T, store JobQueue, j *Job) {
-	if err := store.AddJob(j); err != nil {
+func testAdd(t *testing.T, store ItemQueue, j DbItem) {
+	if err := store.Add(j); err != nil {
 		t.Errorf("failed to addjob, err:%s", err.Error())
 	}
 }
 
-func testGetJob(t *testing.T, store JobQueue, retJobs []*Job) {
-	jobs, err := store.GetJobs()
-	if err != nil {
-		t.Errorf("failed to get jobs, err:%s", err.Error())
-		return
-	}
-
-	if len(retJobs) != len(jobs) {
-		t.Errorf("jobs length not match, len1:%+v, len2:%d, jobs1:%+v, jobs2:%+v",
-			len(retJobs), len(jobs), retJobs, jobs)
-		return
+func testDelete(t *testing.T, store ItemQueue, j DbItem) {
+	if err := store.Delete(j); err != nil {
+		t.Errorf("failed to addjob, err:%s", err.Error())
 	}
 }
 
-func testDoneJob(t *testing.T, store JobQueue, j *Job) {
-	err := store.DeleteJob(j, false)
+func testGet(t *testing.T, store ItemQueue, j DbItem) {
+	err := store.Get(j)
 	if err != nil {
-		t.Errorf("failed to done job, err:%s", err.Error())
+		t.Errorf("failed to get items, err:%s", err.Error())
 	}
+}
+
+func testGetAll(t *testing.T, store ItemQueue, itemType DbItem) []DbItem {
+	items, err := store.GetAll(itemType)
+	if err != nil {
+		t.Fatalf("failed to get items, err:%s", err.Error())
+	}
+	return items
 }

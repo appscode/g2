@@ -9,7 +9,7 @@ const (
 	PRIORITY_HIGH = 1
 
 	JobPrefix       = "H:"
-	SchedJobPrefix  = "S:"
+	CronJobPrefix   = "S:"
 	EpochTimePrefix = "UTC-"
 )
 
@@ -22,7 +22,7 @@ type Job struct {
 	Denominator  int       `json:"denominator,omitempty"`
 	CreateAt     time.Time `json:"created_at,omitempty"`
 	ProcessAt    time.Time `json:"process_at,omitempty"`
-	TimeoutSec   int       `json:"timeout_sec,omitempty"`
+	TimeoutSec   int32     `json:"timeout_sec,omitempty"`
 	CreateBy     int64     `json:"created_by,omitempty"` //client sessionId
 	ProcessBy    int64     `json:"process_by,omitempty"` //worker sessionId
 	FuncName     string    `json:"function_name,omitempty"`
@@ -41,4 +41,20 @@ type CronJob struct {
 	Created       int       `json:"created,omitempty"`
 	SuccessfulRun int       `json:"successful_run,omitempty"`
 	FailedRun     int       `json:"failed_run,omitempty"`
+}
+
+func (c *Job) Key() string {
+	return c.Handle
+}
+
+func (c *Job) Prefix() string {
+	return JobPrefix
+}
+
+func (c *CronJob) Key() string {
+	return c.Handle
+}
+
+func (c *CronJob) Prefix() string {
+	return CronJobPrefix
 }
