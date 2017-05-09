@@ -5,17 +5,19 @@
 G2
 ==========
 
-G2 is a server, worker and client implementation of [Gearman](http://gearman.org/) in [Go Programming Language](http://golang.org). It contains two sub-packages:
+G2 is a server, worker and client implementation of [Gearman](http://gearman.org/) in [Go Programming Language](http://golang.org).
 
-The client package is used for sending jobs to the Gearman job server,
-and getting responses from the server.
+The client package is used for sending jobs to the Gearman job server and getting responses from the server.
 
 	"github.com/appscode/g2/client"
 
-The worker package will help developers in developing Gearman worker
-service easily.
+The worker package will help developers in developing Gearman worker service easily.
 
 	"github.com/appscode/g2/worker"
+	    
+The gearadmin package implements a client for the [gearman admin protocol](http://gearman.org/protocol/).
+
+    "github.com/appscode/g2/gearadmin"
 
 [![GoDoc](https://godoc.org/github.com/appscode/g2?status.png)](https://godoc.org/github.com/appscode/g2)
 
@@ -75,10 +77,10 @@ how to change monitor address ?
 // Limit number of concurrent jobs execution.
 // Use worker.Unlimited (0) if you want no limitation.
 w := worker.New(worker.OneByOne)
-w.ErrHandler = func(e error) {
+w.ErrorHandler = func(e error) {
 	log.Println(e)
 }
-w.AddServer("127.0.0.1:4730")
+w.AddServer("tcp4", "127.0.0.1:4730")
 // Use worker.Unlimited (0) if you want no timeout
 w.AddFunc("ToUpper", ToUpper, worker.Unlimited)
 // This will give a timeout of 5 seconds
@@ -94,46 +96,33 @@ go w.Work()
 ## Client
 
 ```go
-// ...
 c, err := client.New("tcp4", "127.0.0.1:4730")
-// ... error handling
 defer c.Close()
+//error handling
 c.ErrorHandler = func(e error) {
 	log.Println(e)
 }
 echo := []byte("Hello\x00 world")
 echomsg, err := c.Echo(echo)
-// ... error handling
 log.Println(string(echomsg))
 jobHandler := func(resp *client.Response) {
 	log.Printf("%s", resp.Data)
 }
-handle, err := c.Do("ToUpper", echo, client.JobNormal, jobHandler)
-// ...
+handle, err := c.Do("ToUpper", echo, runtime.JobNormal, jobHandler)
 ```
 
 ## Gearman Admin Client
 Package gearadmin provides simple bindings to the gearman admin protocol: http://gearman.org/protocol/. Here's an example program that outputs the status of all worker queues in gearman:
 
 ```go
-package main
-
-import (
-	"fmt"
-	"github.com/appscode/g2/gearadmin"
-	"net"
-)
-
-func main() {
-	c, err := net.Dial("tcp", "localhost:4730")
-	if err != nil {
-		panic(err)
-	}
-	defer c.Close()
-	admin := gearadmin.NewGearmanAdmin(c)
-	status, _ := admin.Status()
-	fmt.Printf("%#v\n", status)
+c, err := net.Dial("tcp", "localhost:4730")
+if err != nil {
+	panic(err)
 }
+defer c.Close()
+admin := gearadmin.NewGearmanAdmin(c)
+status, _ := admin.Status()
+fmt.Printf("%#v\n", status)
 ```
 
 Build Instructions
