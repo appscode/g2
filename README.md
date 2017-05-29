@@ -41,11 +41,11 @@ Usage
 ## Server
 	how to start gearmand?
 
-	./gearmand --addr="0.0.0.0:4730"
+	./gearmand run --v=3 --addr="0.0.0.0:4730"
 
-	how to not use leveldb as storage?
+	how to specify leveldb location?
 
-	./gearmand --storage-dir= --addr="0.0.0.0:4730"
+	./gearmand run --v=3 --storage-dir=/my-dir --addr="0.0.0.0:4730"
 
 how to track stats:
 
