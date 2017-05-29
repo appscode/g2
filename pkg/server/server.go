@@ -7,21 +7,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/appscode/g2/pkg/metrics"
 	. "github.com/appscode/g2/pkg/runtime"
 	"github.com/appscode/g2/pkg/storage"
+	"github.com/appscode/g2/pkg/storage/leveldb"
 	"github.com/appscode/log"
-	"github.com/ngaut/stats"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	lberror "github.com/syndtr/goleveldb/leveldb/errors"
 	"gopkg.in/robfig/cron.v2"
 )
 
+type Config struct {
+	ListenAddr string
+	Storage    string
+	WebAddress string
+}
+
 type Server struct {
+	config         *Config
 	protoEvtCh     chan *event
 	ctrlEvtCh      chan *event
 	funcWorker     map[string]*jobworkermap //function worker
@@ -42,8 +53,9 @@ var ( //const replys, to avoid building it every time
 	nojobReply  = constructReply(PT_NoJob, nil)
 )
 
-func NewServer(store storage.Db) *Server {
-	return &Server{
+func NewServer(cfg *Config) *Server {
+	srv := &Server{
+		config:     cfg,
 		funcWorker: make(map[string]*jobworkermap),
 		protoEvtCh: make(chan *event, 100),
 		ctrlEvtCh:  make(chan *event, 100),
@@ -51,11 +63,20 @@ func NewServer(store storage.Db) *Server {
 		client:     make(map[int64]*Client),
 		jobs:       make(map[string]*Job),
 		opCounter:  make(map[PT]int64),
-		store:      store,
 		cronSvc:    cron.New(),
 		cronJobs:   make(map[string]*CronJob),
 		mu:         &sync.RWMutex{},
 	}
+
+	// Initiate data storage
+	if len(cfg.Storage) > 0 {
+		s, err := leveldbq.New(cfg.Storage)
+		if err != nil {
+			log.Info(err)
+		}
+		srv.store = s
+	}
+	return srv
 }
 
 func (s *Server) loadAllJobs() {
@@ -106,16 +127,28 @@ func (s *Server) loadAllCronJobs() {
 	}
 }
 
-func (s *Server) Start(addr string) {
-	ln, err := net.Listen("tcp", addr)
+func (s *Server) Start() {
+	ln, err := net.Listen("tcp", s.config.ListenAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	log.Debug("listening on", s.config.ListenAddr)
 	go s.EvtLoop()
-	log.Debug("listening on", addr)
 
-	go registerWebHandler(s)
+	// Run REST API Server
+	if len(s.config.WebAddress) > 0 {
+		go func() {
+			prometheus.MustRegister(metrics.NewServerCollector(s))
+			http.Handle("/metrics", promhttp.Handler())
+
+			registerAPIHandlers(s)
+
+			log.Infoln("Running web api at", s.config.WebAddress)
+			log.Fatalln(http.ListenAndServe(s.config.WebAddress, nil))
+		}()
+	}
+
 	go s.WatcherLoop()
 	go s.WatchJobTimeout()
 	if s.cronSvc != nil {
@@ -758,28 +791,13 @@ func (s *Server) wakeupTravel() {
 	}
 }
 
-func (s *Server) pubCounter() {
-	for k, v := range s.opCounter {
-		stats.PubInt64(k.String(), v)
-	}
-}
-
 func (s *Server) EvtLoop() {
-	tick := time.NewTicker(1 * time.Second)
 	for {
 		select {
 		case e := <-s.protoEvtCh:
 			s.handleProtoEvt(e)
 		case e := <-s.ctrlEvtCh:
 			s.handleCtrlEvt(e)
-		case <-tick.C:
-			s.pubCounter()
-			stats.PubInt("len(protoEvtCh)", len(s.protoEvtCh))
-			stats.PubInt("worker count", len(s.worker))
-			stats.PubInt("job queue length", len(s.jobs))
-			stats.PubInt("queue count", len(s.funcWorker))
-			stats.PubInt("client count", len(s.client))
-			stats.PubInt64("forwardReport", s.forwardReport)
 		}
 	}
 }

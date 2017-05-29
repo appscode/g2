@@ -1,12 +1,17 @@
 package: github.com/appscode/g2
 import:
-- package: gopkg.in/macaron.v1
-  version: v1.1.11
 - package: github.com/mikespook/golib
-- package: github.com/ngaut/stats
 - package: github.com/syndtr/goleveldb
 - package: github.com/appscode/go
 - package: github.com/appscode/log
 - package: github.com/spf13/pflag
 - package: gopkg.in/robfig/cron.v2
   version: v2
+- package: github.com/mikespook/golib
+- package: github.com/prometheus/client_golang
+  version: ^0.8.0
+- package: github.com/spf13/pflag
+testImport:
+- package: github.com/stretchr/testify
+  subpackages:
+  - assert

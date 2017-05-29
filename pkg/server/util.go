@@ -15,7 +15,6 @@ import (
 
 	"github.com/appscode/g2/pkg/runtime"
 	"github.com/appscode/log"
-	"github.com/ngaut/stats"
 )
 
 var (
@@ -332,15 +331,6 @@ func validProtocolDef() {
 
 func createResCh() chan interface{} {
 	return make(chan interface{}, 1)
-}
-
-func PublishCmdline() {
-	var cmdline string
-	for _, arg := range os.Args {
-		cmdline += arg
-		cmdline += " "
-	}
-	stats.Publish("cmdline", cmdline)
 }
 
 func LocalIP() (net.IP, error) {

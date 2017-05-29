@@ -1,6 +1,8 @@
 package runtime
 
-import "fmt"
+import (
+	"fmt"
+)
 
 /*
 Binary Packet
