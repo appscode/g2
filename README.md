@@ -69,7 +69,7 @@ how to query job status ?
 
 how to change monitor address ?
 
-	export GEARMAND_MONITOR_ADDR=:4567
+	./gearmand run --v=3 --web.addr=:4567
 
 ## Worker
 
