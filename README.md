@@ -51,21 +51,21 @@ how to track stats:
 
 	http://localhost:3000/debug/stats
 
-how to list workers by "cando" ?
-
-	http://localhost:3000/worker/function
-
 how to list all workers ?
 
-	http://localhost:3000/worker
+	http://localhost:3000/workers
 
-how to query job status ?
+how to list workers by "cando" ?
 
-	http://localhost:3000/job/jobhandle
+	http://localhost:3000/workers/<function>
 
 how to list all jobs ?
 
-	http://localhost:3000/job
+	http://localhost:3000/jobs
+
+how to query job status ?
+
+	http://localhost:3000/jobs/<jobhandle>
 
 how to change monitor address ?
 
