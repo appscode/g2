@@ -44,6 +44,11 @@ build_docker() {
 	cat >Dockerfile <<EOL
 FROM alpine
 
+RUN set -x \
+  && apk update \
+  && apk add ca-certificates \
+  && rm -rf /var/cache/apk/*
+
 COPY gearmand /gearmand
 
 USER nobody:nobody

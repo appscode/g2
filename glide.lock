@@ -1,13 +1,13 @@
 hash: 59917b32d44cf36e104fb04fab4f15c98c51ad4faf191efa9390631d400844a9
-updated: 2017-05-29T03:15:52.211186116-07:00
+updated: 2017-05-29T04:56:18.885825592-07:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
 - name: github.com/appscode/go
   version: 04abd631dc552c01c9448db0763611932590cbc4
   subpackages:
-  - flags
   - runtime
+  - version
 - name: github.com/appscode/log
   version: 68e0e42e42c01371f3950571fc87c2298a51dd8f
   subpackages:
@@ -55,9 +55,9 @@ imports:
 - name: github.com/prometheus/procfs
   version: 454a56f35412459b5e684fd5ec0f9211b94f002a
 - name: github.com/spf13/cobra
-  version: e606913c4ee45fec232e67e70105fb6c866b95d9
+  version: 9c28e4bbd74e5c3ed7aacbc552b2cab7cfdfe744
 - name: github.com/spf13/pflag
-  version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
+  version: c7e63cf4530bcd3ba943729cee0efeff2ebea63f
 - name: github.com/syndtr/goleveldb
   version: 8c81ea47d4c41a385645e133e15510fc6a2a74b4
   subpackages:

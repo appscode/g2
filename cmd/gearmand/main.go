@@ -2,30 +2,35 @@
 package main
 
 import (
-	_ "net/http/pprof"
+	"flag"
+	"log"
 	"os"
 
-	gearmand "github.com/appscode/g2/pkg/server"
-	"github.com/appscode/go/flags"
-	"github.com/appscode/go/runtime"
+	"github.com/appscode/go/version"
 	logs "github.com/appscode/log/golog"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
 func main() {
-	cfg := &gearmand.Config{}
-
-	pflag.StringVar(&cfg.ListenAddr, "addr", ":4730", "listening on, such as 0.0.0.0:4730")
-	pflag.StringVar(&cfg.Storage, "storage-dir", os.TempDir()+"/gearmand", "Directory where LevelDB file is stored.")
-	pflag.StringVar(&cfg.WebAddress, "web.addr", ":3000", "Server HTTP api Address")
-
-	defer runtime.HandleCrash()
-
-	flags.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	flags.DumpAll()
+	var rootCmd = &cobra.Command{
+		Use: "gearmand",
+		PersistentPreRun: func(c *cobra.Command, args []string) {
+			c.Flags().VisitAll(func(flag *pflag.Flag) {
+				log.Printf("FLAG: --%s=%q", flag.Name, flag.Value)
+			})
+		},
+	}
+	rootCmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 
-	gearmand.NewServer(cfg).Start()
+	rootCmd.AddCommand(version.NewCmdVersion())
+	rootCmd.AddCommand(NewCmdRun())
+
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(0)
 }

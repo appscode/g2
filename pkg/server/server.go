@@ -32,7 +32,7 @@ type Config struct {
 }
 
 type Server struct {
-	config         *Config
+	config         Config
 	protoEvtCh     chan *event
 	ctrlEvtCh      chan *event
 	funcWorker     map[string]*jobworkermap //function worker
@@ -53,7 +53,7 @@ var ( //const replys, to avoid building it every time
 	nojobReply  = constructReply(PT_NoJob, nil)
 )
 
-func NewServer(cfg *Config) *Server {
+func NewServer(cfg Config) *Server {
 	srv := &Server{
 		config:     cfg,
 		funcWorker: make(map[string]*jobworkermap),
