@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	DefaultTimeout time.Duration = 1000
+	DefaultTimeout time.Duration = time.Second
 )
 
 // One client connect to one server.
@@ -31,7 +31,7 @@ type Client struct {
 	conn         net.Conn
 	rw           *bufio.ReadWriter
 
-	ResponseTimeout time.Duration // response timeout for do() in ms
+	ResponseTimeout time.Duration // response timeout for do()
 
 	ErrorHandler ErrorHandler
 }
@@ -240,7 +240,7 @@ func (client *Client) do(funcname string, data []byte, flag rt.PT) (handle strin
 		client.innerHandler.remove("c")
 		return
 	}
-	var timer = time.After(client.ResponseTimeout * time.Millisecond)
+	var timer = time.After(client.ResponseTimeout)
 	select {
 	case ret := <-result:
 		return ret.handle, ret.err
