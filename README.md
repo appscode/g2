@@ -47,9 +47,9 @@ Usage
 
 	./gearmand run --v=3 --storage-dir=/my-dir --addr="0.0.0.0:4730"
 
-how to track stats:
+how to export metrics to Promettheus:
 
-	http://localhost:3000/debug/stats
+	http://localhost:3000/metrics
 
 how to list all workers ?
 
