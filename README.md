@@ -36,7 +36,7 @@ Both of them:
 
 > $ go get github.com/appscode/g2
 
-G2 gearman server can be installed via [Helm](https://helm.sh/) using the [chart](/chart/g2) included in this repository or from official charts repository. To install the chart with the release name `my-release`:
+G2 gearman server can be installed via pre-built Docker images mentioned in the Github releases. G2 gearman server can also be installed in Kubernetes via [Helm](https://helm.sh/) using the [chart](/chart/g2) included in this repository or from official charts repository. To install the chart with the release name `my-release`:
 ```bash
 $ helm install chart/g2 --name my-release
 ```
