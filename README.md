@@ -5,7 +5,8 @@
 G2
 ==========
 
-G2 is a server, worker and client implementation of [Gearman](http://gearman.org/) in [Go Programming Language](http://golang.org).
+G2 is a modern implementation of [Gearman](http://gearman.org/) in [Go Programming Language](http://golang.org). G2 includes various improvements in retry and connection logic for using in Kubernetes. It comes with built-in Prometheus ready metrics. G2 also implements scheduled jobs via cron expressions.
+
 
 The client package is used for sending jobs to the Gearman job server and getting responses from the server.
 
