@@ -66,7 +66,7 @@ detect_tag() {
     if [ "$git_tag" != '' ]; then
         TAG=$git_tag
         TAG_STRATEGY='git_tag'
-    elif [ "$git_branch" != 'master' ] && [ "$git_branch" != 'HEAD' ]; then
+    elif [ "$git_branch" != 'master' ] && [ "$git_branch" != 'HEAD' ] && [[ "$git_branch" != release-* ]]; then
         TAG=$git_branch
         TAG_STRATEGY='git_branch'
     else
@@ -102,49 +102,58 @@ EOL
 }
 
 build() {
-	local cmd="docker build -t appscode/$IMG:$TAG ."
+	local cmd="docker build -t $DOCKER_REGISTRY/$IMG:$TAG ."
 	echo $cmd; $cmd
 }
 
-docker_up() {
-	local cmd="docker tag appscode/$1 gcr.io/$GCR_PROJECT/$1"
+attic_up() {
+	local cmd="docker tag $DOCKER_REGISTRY/$IMG:$TAG gcr.io/$GCR_PROJECT/$IMG:$TAG"
 	echo $cmd; $cmd
-	cmd="gcloud docker -- push gcr.io/$GCR_PROJECT/$1"
+	cmd="gcloud docker -- push gcr.io/$GCR_PROJECT/$IMG:$TAG"
 	echo $cmd; $cmd
 
-	local cmd="docker tag appscode/$1 docker.appscode.com/$1"
+	local cmd="docker tag $DOCKER_REGISTRY/$IMG:$TAG docker.appscode.com/$IMG:$TAG"
 	echo $cmd; $cmd
-	cmd="docker push docker.appscode.com/$1"
+	cmd="docker push docker.appscode.com/$IMG:$TAG"
+	echo $cmd 
+	until $cmd; do echo "Try again"; done
+}
+
+hub_up() {
+	local cmd="docker push $DOCKER_REGISTRY/$IMG:$TAG"
 	echo $cmd; $cmd
 }
 
-# override this one if you need to change push
-docker_push() {
-	docker_up $IMG:$TAG
+hub_canary() {
+	hub_up
+
+	local cmd="docker tag $DOCKER_REGISTRY/$IMG:$TAG $DOCKER_REGISTRY/$IMG:canary"
+	echo $cmd; $cmd
+	cmd="docker push $DOCKER_REGISTRY/$IMG:canary"
+	echo $cmd; $cmd
 }
 
-docker_pull() {
+attic_pull() {
 	local cmd="docker pull docker.appscode.com/$IMG:$TAG"
 	echo $cmd; $cmd
-	cmd="docker tag docker.appscode.com/$IMG:$TAG appscode/$IMG:$TAG"
+	cmd="docker tag docker.appscode.com/$IMG:$TAG $DOCKER_REGISTRY/$IMG:$TAG"
 	echo $cmd; $cmd
 }
 
-docker_gcr() {
+gcr_pull() {
 	local cmd="gcloud docker -- pull gcr.io/$GCR_PROJECT/$IMG:$TAG"
 	echo $cmd; $cmd
-	cmd="docker tag gcr.io/$GCR_PROJECT/$IMG:$TAG appscode/$IMG:$TAG"
+	cmd="docker tag gcr.io/$GCR_PROJECT/$IMG:$TAG $DOCKER_REGISTRY/$IMG:$TAG"
 	echo $cmd; $cmd
 }
 
 docker_release() {
-	local cmd="docker push appscode/$IMG:$TAG"
-	echo $cmd; $cmd
+	hub_up
 }
 
 docker_check() {
 	name=$IMG-$(date +%s | sha256sum | base64 | head -c 8 ; echo)
-	local cmd="docker run -d -P -it --name=$name appscode/$IMG:$TAG"
+	local cmd="docker run -d -P -it --name=$name $DOCKER_REGISTRY/$IMG:$TAG"
 	echo $cmd; $cmd
 	cmd="docker exec -it $name ps aux"
 	echo $cmd; $cmd
@@ -168,7 +177,7 @@ docker_run() {
 	docker_cmd="${DOCKER_CMD:-}"
 	echo pv > .gitignore
 	mkdir -p pv
-	local cmd="docker run -d -P -it $privileged $net $extra_opts --name=$name appscode/$img:$TAG $docker_cmd"
+	local cmd="docker run -d -P -it $privileged $net $extra_opts --name=$name $DOCKER_REGISTRY/$img:$TAG $docker_cmd"
 	echo $cmd; $cmd
 }
 
@@ -181,7 +190,7 @@ docker_sh() {
 	privileged="${PRIVILEGED_CONTAINER:-}"
 	net="${DOCKER_NETWORK:-}"
 	extra_opts="${EXTRA_DOCKER_OPTS:-}"
-	local cmd="docker run -d -P -it $privileged $net $extra_opts --name=$name appscode/$img:$TAG"
+	local cmd="docker run -d -P -it $privileged $net $extra_opts --name=$name $DOCKER_REGISTRY/$img:$TAG"
 	echo $cmd; $cmd
 	cmd="docker exec -it $name bash"
 	echo $cmd; $cmd
