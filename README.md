@@ -54,7 +54,7 @@ Usage
 
 	./gearmand run --v=3 --storage-dir=/my-dir --addr="0.0.0.0:4730"
 
-how to export metrics to Promettheus:
+how to export metrics to Prometheus:
 
 	http://localhost:3000/metrics
 
