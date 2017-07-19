@@ -1,5 +1,5 @@
-hash: 59917b32d44cf36e104fb04fab4f15c98c51ad4faf191efa9390631d400844a9
-updated: 2017-07-06T08:56:35.930253993-07:00
+hash: ed4a1e08a733e7b456fbafe8ac3e1e6930bf367fcf1cbaeaa6fc1636094669f1
+updated: 2017-07-18T18:24:39.700671951-07:00
 imports:
 - name: github.com/appscode/go
   version: 9fde097ebcef0add8325c8fbee63ae01e7da530e
@@ -19,7 +19,7 @@ imports:
 - name: github.com/golang/glog
   version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/protobuf
-  version: 6e4cc92cc905d5f4a73041c1b8228ea08f4c6147
+  version: 8616e8ee5e20a1704615e6c8d7afcdac06087a67
   subpackages:
   - proto
 - name: github.com/golang/snappy
@@ -54,7 +54,7 @@ imports:
 - name: github.com/prometheus/procfs
   version: 454a56f35412459b5e684fd5ec0f9211b94f002a
 - name: github.com/spf13/cobra
-  version: 8c6fa02d2225de0f9bdcb7ca912556f68d172d8c
+  version: 715f41bd7a70b5111f898b71ab484da52ee6266d
 - name: github.com/spf13/pflag
   version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
 - name: github.com/syndtr/goleveldb
@@ -78,7 +78,9 @@ imports:
   - bson
   - internal/json
 - name: gopkg.in/robfig/cron.v2
-  version: be2e0b0deed5a68ffee390b4583a13aff8321535
+  version: ca60c6d796d4b1f7bb2a8fd5271d8a59aeffb4bf
+  repo: https://github.com/appscode/cron.git
+  vcs: git
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
