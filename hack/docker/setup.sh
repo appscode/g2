@@ -38,16 +38,14 @@ build_binary() {
 
 build_docker() {
 	pushd $REPO_ROOT/hack/docker
-	cp $REPO_ROOT/dist/gearmand/gearmand-linux-amd64 gearmand
+	cp $REPO_ROOT/dist/gearmand/gearmand-alpine-amd64 gearmand
 	chmod 755 gearmand
 
 	cat >Dockerfile <<EOL
 FROM alpine
 
 RUN set -x \
-  && apk update \
-  && apk add ca-certificates \
-  && rm -rf /var/cache/apk/*
+  && apk add --update --no-cache ca-certificates
 
 COPY gearmand /gearmand
 
