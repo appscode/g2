@@ -43,7 +43,7 @@ The following tables lists the configurable parameters of the Stash chart and th
 | ------------------------ | ----------------------------------------------------------------- | ------------------- |
 | `replicaCount`           | Number of stash operator replicas to create                       | `1`                 |
 | `g2.image`               | G2 container image                                                | `appscode/gearmand` |
-| `g2.tag`                 | G2 container image tag                                            | `0.5.0`             |
+| `g2.tag`                 | G2 container image tag                                            | `0.5.1`             |
 | `g2.pullPolicy`          | G2 container image pull policy                                    | `IfNotPresent`      |
 | `g2.serviceType`         | G2 service type                                                   | `ClusterIP`         |
 | `rbac.install`           | install required rbac service account, roles and rolebindings     | `false`             |
