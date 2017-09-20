@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"../client"
+	"github.com/appscode/g2/client"
 	rt "github.com/appscode/g2/pkg/runtime"
 )
 
