@@ -18,7 +18,7 @@ import (
 	. "github.com/appscode/g2/pkg/runtime"
 	"github.com/appscode/g2/pkg/storage"
 	"github.com/appscode/g2/pkg/storage/leveldb"
-	"github.com/appscode/log"
+	"github.com/appscode/go/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	lberror "github.com/syndtr/goleveldb/leveldb/errors"

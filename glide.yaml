@@ -3,7 +3,6 @@ import:
 - package: github.com/mikespook/golib
 - package: github.com/syndtr/goleveldb
 - package: github.com/appscode/go
-- package: github.com/appscode/log
 - package: github.com/spf13/pflag
 - package: gopkg.in/robfig/cron.v2
   repo: https://github.com/appscode/cron.git

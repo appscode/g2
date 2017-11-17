@@ -12,7 +12,7 @@ import (
 	"time"
 
 	rt "github.com/appscode/g2/pkg/runtime"
-	"github.com/appscode/log"
+	"github.com/appscode/go/log"
 )
 
 var (
