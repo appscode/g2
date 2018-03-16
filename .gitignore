@@ -24,3 +24,5 @@ _testmain.go
 dist/
 --crash.log
 .vscode/
+coverage.txt
+profile.out

@@ -1,6 +1,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/appscode/g2)](https://goreportcard.com/report/github.com/appscode/g2)
-
-[Website](https://appscode.com) • [Slack](https://slack.appscode.com) • [Forum](https://discuss.appscode.com) • [Twitter](https://twitter.com/AppsCodeHQ)
+[![Build Status](https://travis-ci.org/appscode/g2.svg?branch=master)](https://travis-ci.org/appscode/g2)
+[![codecov](https://codecov.io/gh/appscode/g2/branch/master/graph/badge.svg)](https://codecov.io/gh/appscode/g2)
+[![Docker Pulls](https://img.shields.io/docker/pulls/appscode/gearmand.svg)](https://hub.docker.com/r/appscode/gearmand/)
+[![Slack](https://slack.appscode.com/badge.svg)](https://slack.appscode.com)
+[![Twitter](https://img.shields.io/twitter/follow/appscodehq.svg?style=social&logo=twitter&label=Follow)](https://twitter.com/intent/follow?screen_name=AppsCodeHQ)
 
 G2
 ==========

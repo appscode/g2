@@ -104,7 +104,7 @@ func TestClientDo(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			fmt.Println("Work status, num: %v, denom: %v", status.Numerator, status.Denominator)
+			fmt.Printf("Work status, num: %v, denom: %v\n", status.Numerator, status.Denominator)
 		}
 	}
 	handle, err := client.Do("scheduledJobTest", []byte("abcdef"),
