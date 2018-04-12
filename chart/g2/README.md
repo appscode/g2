@@ -2,8 +2,10 @@
 [G2 by AppsCode](https://github.com/appscode/g2) is a modern implementation of Gearman server in GO.
 ## TL;DR;
 
-```bash
-$ helm install chart/g2
+```console
+$ helm repo add appscode https://charts.appscode.com/stable/
+$ helm repo update
+$ helm install appscode/g2
 ```
 
 ## Introduction
@@ -17,8 +19,9 @@ This chart bootstraps a [Gearman server](https://github.com/appscode/g2) deploym
 
 ## Installing the Chart
 To install the chart with the release name `my-release`:
-```bash
-$ helm install --name my-release chart/g2
+
+```console
+$ helm install --name my-release appscode/g2
 ```
 The command deploys G2 Gearman server on the Kubernetes cluster in the default configuration. The [configuration](#configuration) section lists the parameters that can be configured during installation.
 
@@ -28,7 +31,7 @@ The command deploys G2 Gearman server on the Kubernetes cluster in the default c
 
 To uninstall/delete the `my-release`:
 
-```bash
+```console
 $ helm delete my-release
 ```
 
@@ -52,15 +55,15 @@ The following tables lists the configurable parameters of the Stash chart and th
 
 Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`. For example:
 
-```bash
-$ helm install --name my-release --set image.tag=v0.2.1 chart/g2
+```console
+$ helm install --name my-release --set image.tag=v0.2.1 appscode/g2
 ```
 
 Alternatively, a YAML file that specifies the values for the parameters can be provided while
 installing the chart. For example:
 
-```bash
-$ helm install --name my-release --values values.yaml chart/g2
+```console
+$ helm install --name my-release --values values.yaml appscode/g2
 ```
 
 ## RBAC
@@ -85,7 +88,7 @@ If the output contains "alpha" and/or "beta", you can may install the chart with
 To enable the creation of RBAC resources (On clusters with RBAC). Do the following:
 
 ```console
-$ helm install --name my-release chart/g2 --set rbac.install=true
+$ helm install --name my-release appscode/g2 --set rbac.install=true
 ```
 
 ### Changing RBAC manifest apiVersion
@@ -93,5 +96,5 @@ $ helm install --name my-release chart/g2 --set rbac.install=true
 By default the RBAC resources are generated with the "v1beta1" apiVersion. To use "v1alpha1" do the following:
 
 ```console
-$ helm install --name my-release chart/g2 --set rbac.install=true,rbac.apiVersion=v1alpha1
+$ helm install --name my-release appscode/g2 --set rbac.install=true,rbac.apiVersion=v1alpha1
 ```
