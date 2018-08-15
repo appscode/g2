@@ -1,8 +1,8 @@
 hash: 9ec5195f68df7fb3b736027fc68f897f5bb98150c766626db6c01168a1521a8a
-updated: 2018-03-16T07:32:49.385329899-07:00
+updated: 2018-08-15T11:28:14.963215001-07:00
 imports:
 - name: github.com/appscode/go
-  version: f8f2e1c7d2d10789cdd0540468b487d14421dbf9
+  version: df3c57fca2bef0e5b7fd085507deb20f18c790df
   subpackages:
   - context
   - log
@@ -18,13 +18,13 @@ imports:
 - name: github.com/golang/glog
   version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/protobuf
-  version: 1643683e1b54a9e88ad26d98f81400c8c9d9f4f9
+  version: b4deda0973fb4c70b50d226b1af49f3da59f5265
   subpackages:
   - proto
 - name: github.com/golang/snappy
   version: d9eb7a3d35ec988b8585d4a0068e462c27d28380
 - name: github.com/google/uuid
-  version: dec09d789f3dba190787f8b4454c7d3c936fed9e
+  version: 8c31c18f31ede9fc8eae72290a7e7a8064e9b3e3
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/matttproud/golang_protobuf_extensions
@@ -57,11 +57,11 @@ imports:
   subpackages:
   - xfs
 - name: github.com/spf13/cobra
-  version: c6c44e6fdcc30161c7f4480754da7230d01c06e3
+  version: ef82de70bb3f60c65fb8eebacbb2d122ef517385
 - name: github.com/spf13/pflag
-  version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
+  version: 583c0c0531f06d5278b7d917446061adc344b5cd
 - name: github.com/syndtr/goleveldb
-  version: 169b1b37be738edb2813dab48c97a549bcf99bb5
+  version: ae2bd5eed72d46b28834ec3f60db3a3ebedd8dbd
   subpackages:
   - leveldb
   - leveldb/cache
@@ -76,7 +76,7 @@ imports:
   - leveldb/table
   - leveldb/util
 - name: gopkg.in/mgo.v2
-  version: 3f83fa5005286a7fe593b055f0d7771a7dce4655
+  version: 9856a29383ce1c59f308dd1cf0363a79b5bef6b5
   subpackages:
   - bson
   - internal/json
@@ -94,6 +94,6 @@ testImports:
   subpackages:
   - difflib
 - name: github.com/stretchr/testify
-  version: 12b6f73e6084dad08a7c6e575284b177ecafbc71
+  version: f35b8ab0b5a2cef36673838d662e249dd9c94686
   subpackages:
   - assert

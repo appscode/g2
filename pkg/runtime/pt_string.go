@@ -2,7 +2,7 @@
 
 package runtime
 
-import "fmt"
+import "strconv"
 
 const (
 	_PT_name_0 = "PT_CanDoPT_CantDoPT_ResetAbilitiesPT_PreSleep"
@@ -23,6 +23,6 @@ func (i PT) String() string {
 		i -= 6
 		return _PT_name_1[_PT_index_1[i]:_PT_index_1[i+1]]
 	default:
-		return fmt.Sprintf("PT(%d)", i)
+		return "PT(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
 }
